@@ -12,7 +12,7 @@ for Python.
 No install required — run it straight from GitHub with `npx` (needs Node.js >= 24):
 
 ```bash
-npx github:Andrew-Jayne/ExplictJS src/
+npx github:Andrew-Jayne/ExplicitJS src/
 ```
 
 > Not published to npm yet, so the command runs from the repo. `npx` clones it
@@ -41,11 +41,11 @@ compiler, so no build step or `tsconfig` is required to analyze a file.
 ## Usage
 
 The examples below use `explicit-ts` as the command name. Until it's published
-to npm, either swap `npx explicit-ts` for `npx github:Andrew-Jayne/ExplictJS`, or
+to npm, either swap `npx explicit-ts` for `npx github:Andrew-Jayne/ExplicitJS`, or
 install it once to get the `explicit-ts` command:
 
 ```bash
-npm install -g github:Andrew-Jayne/ExplictJS
+npm install -g github:Andrew-Jayne/ExplicitJS
 ```
 
 ```bash

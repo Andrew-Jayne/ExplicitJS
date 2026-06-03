@@ -1,5 +1,5 @@
 {
-  "name": "explicit-ts",
+  "name": "explicitjs",
   "version": "1.0.0",
   "description": "A semantic clarity enforcer for production JavaScript/TypeScript — flags code where the author's intent is ambiguous.",
   "keywords": [
@@ -14,7 +14,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "explicit-ts": "dist/cli.js",
+    "explicitjs": "dist/cli.js",
     "explicit": "dist/cli.js"
   },
   "files": [

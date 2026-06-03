@@ -1,8 +1,8 @@
-# explicit-ts
+# ExplicitJS
 
 A semantic clarity enforcer for production JavaScript & TypeScript.
 
-`explicit-ts` flags code where the author's intent is ambiguous — patterns that
+ExplicitJS flags code where the author's intent is ambiguous — patterns that
 force the next reader (or LLM) to guess what was meant instead of knowing. It is
 the JS/TS counterpart of [`explicit`](https://github.com/Andrew-Jayne/explicit)
 for Python.
@@ -15,9 +15,9 @@ No install required — run it straight from GitHub with `npx` (needs Node.js >=
 npx github:Andrew-Jayne/ExplicitJS src/
 ```
 
-> Not published to npm yet, so the command runs from the repo. `npx` clones it
-> and runs the build automatically (via the `prepare` script). Once it's on npm
-> this becomes the shorter `npx explicit-ts src/`.
+> This is the intended way to run it — there's nothing to publish or install.
+> `npx` clones the repo, installs its deps, and builds it automatically (via the
+> `prepare` script). The first run is slower while it builds; npx caches it after.
 
 ## What it catches
 
@@ -40,47 +40,52 @@ compiler, so no build step or `tsconfig` is required to analyze a file.
 
 ## Usage
 
-The examples below use `explicit-ts` as the command name. Until it's published
-to npm, either swap `npx explicit-ts` for `npx github:Andrew-Jayne/ExplicitJS`, or
-install it once to get the `explicit-ts` command:
+Run it with `npx github:Andrew-Jayne/ExplicitJS <path> [options]`. The examples
+below use `explicitjs` for brevity — either install it globally:
 
 ```bash
 npm install -g github:Andrew-Jayne/ExplicitJS
 ```
 
+…or alias the npx call:
+
 ```bash
-# Analyze a file or a directory
-npx explicit-ts src/
-npx explicit-ts app.ts
-
-# JSON / CSV output (for CI / tooling)
-npx explicit-ts . --format json
-npx explicit-ts . --format csv
-
-# Statistics only
-npx explicit-ts . --stats-only
-
-# Skip specific checks
-npx explicit-ts . --exclude-type ternary --exclude-type loose_equality
-
-# Strict mode: flag every arrow / function expression, not just ambiguous ones
-npx explicit-ts . --include-extra arrow
-
-# Write the report to a file (colors stripped)
-npx explicit-ts . -o report.txt
-
-# Print version / help
-npx explicit-ts --version
-npx explicit-ts --help
+alias explicitjs="npx github:Andrew-Jayne/ExplicitJS"
 ```
 
-`explicit-ts` exits non-zero when any check is found, so it works as a CI gate.
+```bash
+# Analyze a file or a directory
+explicitjs src/
+explicitjs app.ts
+
+# JSON / CSV output (for CI / tooling)
+explicitjs . --format json
+explicitjs . --format csv
+
+# Statistics only
+explicitjs . --stats-only
+
+# Skip specific checks
+explicitjs . --exclude-type ternary --exclude-type loose_equality
+
+# Strict mode: flag every arrow / function expression, not just ambiguous ones
+explicitjs . --include-extra arrow
+
+# Write the report to a file (colors stripped)
+explicitjs . -o report.txt
+
+# Print version / help
+explicitjs --version
+explicitjs --help
+```
+
+ExplicitJS exits non-zero when any check is found, so it works as a CI gate.
 It analyzes `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.mts`, `.cts` and
 skips `node_modules`, `dist`, `build`, dotfile directories, and `*.d.ts`.
 
 ## Configuration
 
-`explicit-ts` reads defaults from an `"explicit"` key in your `package.json`, or
+ExplicitJS reads defaults from an `"explicit"` key in your `package.json`, or
 from a `.explicitrc.json` file — discovered by walking up from the analyzed path,
 or pointed at explicitly with `--config`. **Command-line flags always override
 the config file**; the two list settings (`exclude-type` and `include-extra`)

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Executable entry point for `explicit-ts` (the npx target).
+ * Executable entry point for ExplicitJS (the npx target).
  */
 
 import { readFileSync } from "node:fs";
@@ -47,7 +47,7 @@ function main(): void {
     process.exit(0);
   }
   if (args.showVersion === true) {
-    process.stdout.write(`explicit-ts ${packageVersion()}\n`);
+    process.stdout.write(`ExplicitJS ${packageVersion()}\n`);
     process.exit(0);
   }
 

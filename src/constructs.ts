@@ -1,5 +1,5 @@
 /**
- * Central type registry for explicit-ts.
+ * Central type registry for ExplicitJS.
  *
  * `CheckType` enumerates every check the analyzer can produce; its members are
  * also the valid `--exclude-type` values. `StyleCheck` is the record every

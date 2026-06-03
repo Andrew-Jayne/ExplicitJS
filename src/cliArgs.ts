@@ -29,10 +29,10 @@ export interface Args {
 
 export class ArgError extends Error {}
 
-const HELP_TEXT = `explicit-ts - Enforce semantic clarity in JavaScript/TypeScript code
+const HELP_TEXT = `ExplicitJS - Enforce semantic clarity in JavaScript/TypeScript code
 
 Usage:
-  explicit-ts <path> [options]
+  explicitjs <path> [options]
 
 Arguments:
   path                       File or directory to analyze
@@ -54,10 +54,10 @@ Check types:
   ${CHECK_TYPES.join(", ")}
 
 Examples:
-  npx explicit-ts src/
-  npx explicit-ts app.ts --format json
-  npx explicit-ts . --exclude-type ternary --exclude-type loose_equality
-  npx explicit-ts . --include-extra arrow`;
+  npx github:Andrew-Jayne/ExplicitJS src/
+  npx github:Andrew-Jayne/ExplicitJS app.ts --format json
+  npx github:Andrew-Jayne/ExplicitJS . --exclude-type ternary --exclude-type loose_equality
+  npx github:Andrew-Jayne/ExplicitJS . --include-extra arrow`;
 
 export function helpText(): string {
   return HELP_TEXT;

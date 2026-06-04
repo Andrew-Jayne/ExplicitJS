@@ -6,35 +6,25 @@ ExplicitJS flags code where the author's intent is ambiguous — patterns that f
 
 ## Quick start
 
-ExplicitJS is run with [Deno](https://deno.com/), straight from this
-repository — there is no build artifact, no package registry, and no install
-step. Point Deno at the source entry point and Deno fetches the import graph
-and caches it.
+ExplicitJS is run with [Deno](https://deno.com/), straight from this repository. Point Deno at the source entry point and Deno fetches the import graph and caches it.
 
 **Latest (tracks `main`):**
 
 ```bash
-deno run --allow-read --allow-env \
-  https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/main/src/cli.ts \
-  <path-to-scan>
+deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/main/src/cli.ts <path-to-scan>
 ```
 
-**Pinned to a release tag** (recommended — reproducible, immune to future
-commits on `main`):
+**Pinned to a release tag** (recommended — reproducible, immune to future commits on `main`):
 
 ```bash
-deno run --allow-read --allow-env \
-  https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1.0.0/src/cli.ts \
-  <path-to-scan>
+deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1.0.0/src/cli.ts <path-to-scan>
 ```
 
 Available tags are on the [Releases page](https://github.com/Andrew-Jayne/ExplicitJS/releases).
 You can also pin to a specific commit SHA for full immutability:
 
 ```bash
-deno run --allow-read --allow-env \
-  https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/<commit-sha>/src/cli.ts \
-  <path-to-scan>
+deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/<commit-sha>/src/cli.ts <path-to-scan>
 ```
 
 Deno caches the source after the first fetch, so the URL only resolves once
@@ -43,17 +33,13 @@ per pinned version.
 **Shorter command** — install any of the above URLs as a Deno-managed shim:
 
 ```bash
-deno install -g --allow-read --allow-env -n explicitjs \
-  https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1.0.0/src/cli.ts
+deno install -g --allow-read --allow-env -n explicitjs https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1.0.0/src/cli.ts
 explicitjs <path-to-scan>
 ```
 
-`<path-to-scan>` is whatever file or directory you want analyzed — `src/`,
-`app.ts`, `.`, etc.
+`<path-to-scan>` is whatever file or directory you want analyzed — `src/`, `app.ts`, `.`, etc.
 
-`--allow-env` is needed because the `typescript` package reads `TSC_*`
-watch-mode variables at init — we never use them, but Deno blocks the read
-without the flag.
+`--allow-env` is needed because the `typescript` package reads `TSC_*` watch-mode variables at init — we never use them, but Deno blocks the read without the flag.
 
 ## What it catches
 
@@ -104,27 +90,20 @@ explicitjs --help
 ```
 
 ExplicitJS exits non-zero when any check is found, so it works as a CI gate.
-It analyzes `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.mts`, `.cts` and
-skips `node_modules`, `dist`, `build`, dotfile directories, and `*.d.ts`.
+It analyzes `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.mts`, `.cts` and skips `node_modules`, `dist`, `build`, dotfile directories, and `*.d.ts`.
 
 ## Configuration
 
-ExplicitJS reads defaults from an `"explicit"` key in your `package.json`, or
-from a `.explicitrc.json` file — discovered by walking up from the analyzed path,
-or pointed at explicitly with `--config`. **Command-line flags always override
-the config file**; the two list settings (`exclude-type` and `include-extra`)
-are merged with their CLI counterparts.
+ExplicitJS reads defaults from a `.explicitrc.json` file — discovered by walking up from the analyzed path, or pointed at explicitly with `--config`. **Command-line flags always override the config file**; the two list settings (`exclude-type` and `include-extra`) are merged with their CLI counterparts.
 
 ```jsonc
-// package.json
+// .explicitrc.json
 {
-  "explicit": {
-    "format": "text",                                  // text | json | csv
-    "exclude-type": ["ternary", "single_use_var"],     // turn checks off
-    "include-extra": ["arrow"],                         // opt into stricter checks
-    "no-color": false,
-    "stats-only": false
-  }
+  "format": "text",                                  // text | json | csv
+  "exclude-type": ["ternary", "single_use_var"],     // turn checks off
+  "include-extra": ["arrow"],                         // opt into stricter checks
+  "no-color": false,
+  "stats-only": false
 }
 ```
 
@@ -149,9 +128,7 @@ The single-use checks deliberately ignore a few legitimate patterns:
 - **Exports** — exported names (`export function`, `export const`,
   `export { … }`, `export default x`) are never flagged as single-use, since
   references from outside the file are invisible to a single-file analysis.
-- **Entry points** — functions named `main`, and (when a `package.json` `bin`
-  field is present) the conventional `main` entry, are never flagged as
-  single-use functions.
+- **Entry points** — functions named `main` are never flagged as single-use functions (the conventional CLI entry).
 
 ## Output formats
 
@@ -164,21 +141,13 @@ The single-use checks deliberately ignore a few legitimate patterns:
 The Zen of Python says "explicit is better than implicit." This tool enforces
 that line in JavaScript and TypeScript.
 
-Most of the patterns flagged here exist for one reason: saving keystrokes. That
-trade made more sense when you were typing every character yourself. It makes no
-sense now. Your editor has autocomplete. Your AI agent will write the verbose
-version just as fast as the clever one. The keystrokes are free. The ambiguity
-is not.
+Most of the patterns flagged here exist for one reason: saving keystrokes. That trade made more sense when you were typing every character yourself. It makes no sense now. Your editor has autocomplete. Your AI agent will write the verbose version just as fast as the clever one. The keystrokes are free. The ambiguity is not.
 
-The goal is not style, it's semantic precision: code should say what it means so
-that the next person (or LLM) reading it can understand the intent without
-guessing.
+The goal is not style, it's semantic precision: code should say what it means so that the next person (or LLM) reading it can understand the intent without guessing.
 
 ## Development
 
-ExplicitJS is a Deno project — `deno.json` is the only build manifest. There is
-no `package.json`, no `node_modules`, no bundle step, and no published npm or
-JSR package. Users `deno run` straight from this repo.
+ExplicitJS is a Deno project — `deno.json` is the only build manifest. There is no `package.json`, no `node_modules`, no bundle step, and no published npm or JSR package. Users `deno run` straight from this repo.
 
 ```bash
 deno task start <path-to-scan>   # run the CLI against any source
@@ -200,19 +169,9 @@ That's the whole release process. The tag *is* the artifact — users who want
 to pin instead of tracking `main` point Deno at the tag URL:
 
 ```bash
-deno run --allow-read --allow-env \
-  https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1.2.3/src/cli.ts \
-  <path-to-scan>
+deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1.2.3/src/cli.ts <path-to-scan>
 ```
-
-No bundle, no upload, no release-time secrets — the only attack surface on
-this side is the commits themselves, which are visible in `git log`. The one
-runtime dependency, `npm:typescript`, is fetched by each user's Deno on first
-run and cached. If npm or TypeScript itself is ever compromised the whole JS
-ecosystem has a problem — this analyzer included — and the right response is
-to pin a new known-good version, not to fight the shape of the registry.
 
 ## Requirements
 
-Users need [Deno](https://deno.com/) >= 2.8 installed. Building from source
-needs the same.
+Users need [Deno](https://deno.com/) >= 2.8 installed. Building from source needs the same.

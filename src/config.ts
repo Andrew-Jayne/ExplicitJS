@@ -1,12 +1,5 @@
 /**
- * Project configuration discovery.
- *
- * Settings come from an `"explicit"` key in `package.json` or from a
- * `.explicitrc.json` file, discovered by walking up from the analyzed path (or
- * pointed at explicitly with `--config`). Every flag-backed field defaults to
- * `undefined` ("not specified") so the CLI layer can tell an explicit choice
- * from a fallback. `package.json` `bin` targets are collected as entry points
- * so they are never flagged as single-use functions.
+ * Project configuration discovery. Settings come from a `.explicitrc.json` file, discovered by walking up from the analyzed path (or pointed at explicitly with `--config`). Every flag-backed field defaults to `undefined` ("not specified") so the CLI layer can tell an explicit choice from a fallback.
  */
 
 import { existsSync, readFileSync, statSync } from "node:fs";
@@ -58,13 +51,8 @@ export function loadConfig(start: string, configPath?: string): Config {
   const config = emptyConfig();
 
   if (configPath !== undefined) {
-    applyFile(configPath, config);
+    applyRcFile(configPath, config);
     return config;
-  }
-
-  const packageJson = findUp(start, "package.json");
-  if (packageJson !== undefined) {
-    applyFile(packageJson, config);
   }
 
   const rcPath = findUp(start, ".explicitrc.json");
@@ -87,42 +75,12 @@ function readJson(filepath: string): Record<string, unknown> | undefined {
   return undefined;
 }
 
-function applyFile(filepath: string, config: Config): void {
-  if (path.basename(filepath) === ".explicitrc.json") {
-    applyRcFile(filepath, config);
-    return;
-  }
-  const data = readJson(filepath);
-  if (data === undefined) {
-    return;
-  }
-  collectEntryPoints(data, config);
-  const table = data["explicit"];
-  if (typeof table === "object" && table !== null) {
-    applyTable(table as Record<string, unknown>, config);
-  }
-}
-
 function applyRcFile(filepath: string, config: Config): void {
   const data = readJson(filepath);
   if (data === undefined) {
     return;
   }
   applyTable(data, config);
-}
-
-function collectEntryPoints(
-  data: Record<string, unknown>,
-  config: Config,
-): void {
-  const bin = data["bin"];
-  if (typeof bin === "string") {
-    config.entryPoints.add("main");
-  } else if (typeof bin === "object" && bin !== null) {
-    // Bin keys are command names; the targets are files, so we cannot recover a
-    // function name. `main` is the conventional CLI entry, so exempt it.
-    config.entryPoints.add("main");
-  }
 }
 
 function isEnabledExtra(value: string): boolean {

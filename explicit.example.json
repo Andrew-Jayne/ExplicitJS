@@ -1,50 +1,34 @@
 {
-  "//": "Example configuration for explicit-ts. Copy the contents of the",
-  "//1": "\"explicit\" object into your package.json (under a top-level",
-  "//2": "\"explicit\" key), or drop this object on its own into a",
-  "//3": "\".explicitrc.json\" file. Every key is optional; the value shown is",
-  "//4": "the default used when the key is omitted. Command-line flags always",
-  "//5": "override these values (and the list settings, exclude-type /",
-  "//6": "include-extra, are merged with their --exclude-type / --include-extra",
-  "//7": "counterparts on the CLI).",
+  "//": "Example .explicitrc.json. Drop this file at the root of the project you want ExplicitJS to analyze (it walks up from the analyzed path looking for it). Every key is optional; the value shown is the default used when the key is omitted. Command-line flags always override these values, and the two list settings (exclude-type, include-extra) are merged with their --exclude-type / --include-extra counterparts on the CLI.",
 
-  "explicit": {
-    "format": "text",
+  "format": "text",
 
-    "//exclude-type": [
-      "Turn checks off entirely. Defaults to [] (nothing excluded). Each value:",
-      "  if                  - truthiness test in an if:        if (items)",
-      "  while               - truthiness test in while/do:     while (queue)",
-      "  assert              - truthiness in assert/console.assert/assert.ok",
-      "  ternary             - any inline conditional:          cond ? x : y",
-      "  optional_chain      - optional chaining:                a?.b?.c?.d",
-      "  bool_op             - && / || with a non-boolean operand",
-      "  arrow               - an arrow/function expression (only implicit-boolean",
-      "                        ones unless promoted via include-extra below)",
-      "  filter              - .filter(Boolean) truthiness filter",
-      "  loose_equality      - == / != (coerces operands; use === / !==)",
-      "  single_letter_var   - one-character names: x, n, e",
-      "  single_use_var      - a variable assigned once and read once",
-      "  single_use_func     - a function defined once and called once"
-    ],
-    "exclude-type": [],
+  "//exclude-type": [
+    "Turn checks off entirely. Defaults to [] (nothing excluded). Each value:",
+    "  if                  - truthiness test in an if:        if (items)",
+    "  while               - truthiness test in while/do:     while (queue)",
+    "  assert              - truthiness in assert/console.assert/assert.ok",
+    "  ternary             - any inline conditional:          cond ? x : y",
+    "  optional_chain      - optional chaining:                a?.b?.c?.d",
+    "  bool_op             - && / || with a non-boolean operand",
+    "  arrow               - an arrow/function expression (only implicit-boolean",
+    "                        ones unless promoted via include-extra below)",
+    "  filter              - .filter(Boolean) truthiness filter",
+    "  loose_equality      - == / != (coerces operands; use === / !==)",
+    "  single_letter_var   - one-character names: x, n, e",
+    "  single_use_var      - a variable assigned once and read once",
+    "  single_use_func     - a function defined once and called once"
+  ],
+  "exclude-type": [],
 
-    "//include-extra": [
-      "Opt into stricter variants of the 'exotic' checks. By default these only",
-      "flag an ambiguous (implicit-boolean) use; listing a check here flags",
-      "EVERY occurrence. Defaults to []. Valid values:",
-      "  arrow - flag all arrow / function expressions, not just ambiguous ones"
-    ],
-    "include-extra": [],
+  "//include-extra": [
+    "Opt into stricter variants of the 'exotic' checks. By default these only",
+    "flag an ambiguous (implicit-boolean) use; listing a check here flags",
+    "EVERY occurrence. Defaults to []. Valid values:",
+    "  arrow - flag all arrow / function expressions, not just ambiguous ones"
+  ],
+  "include-extra": [],
 
-    "no-color": false,
-    "stats-only": false
-  },
-
-  "//bin": [
-    "Not part of the \"explicit\" object, but read by explicit-ts: when a",
-    "package.json declares a \"bin\" field, the conventional \"main\" entry",
-    "function is never reported as a single-use function (alongside any function",
-    "literally named main)."
-  ]
+  "no-color": false,
+  "stats-only": false
 }

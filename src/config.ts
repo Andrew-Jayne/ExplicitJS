@@ -7,9 +7,9 @@ import path from "node:path";
 import {
   CheckType,
   EXTRA_CHECKS,
-  ReportFormat,
   isCheckType,
   isReportFormat,
+  ReportFormat,
 } from "./constructs.ts";
 
 export interface Config {

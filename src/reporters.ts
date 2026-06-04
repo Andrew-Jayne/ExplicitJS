@@ -3,12 +3,7 @@
  * report.
  */
 
-import {
-  CheckType,
-  Colors,
-  ReportFormat,
-  type StyleCheck,
-} from "./constructs.ts";
+import { CheckType, Colors, ReportFormat, type StyleCheck } from "./constructs.ts";
 
 const TYPE_COLORS: Record<string, string> = {
   [CheckType.IF]: Colors.YELLOW,
@@ -202,9 +197,11 @@ export function generateStatisticsReport(
 
   if (checks.length > 0) {
     output.push(Colors.paint(Colors.BOLD, "By type:"));
-    for (const [checkType, count] of [...countByType(checks).entries()].sort(
-      byCountDescending,
-    )) {
+    for (
+      const [checkType, count] of [...countByType(checks).entries()].sort(
+        byCountDescending,
+      )
+    ) {
       const percentage = (count / checks.length) * 100;
       output.push(
         "  " +

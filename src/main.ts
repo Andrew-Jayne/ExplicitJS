@@ -148,8 +148,8 @@ export function run(args: Args): number {
   const config = loadConfig(args.path, args.config);
   const settings = resolveSettings(args, config);
 
-  if (settings.noColor === true || Deno.stdout.isTerminal() === false) {
-    Colors.disable();
+  if (settings.noColor !== true && Deno.stdout.isTerminal() === true) {
+    Colors.enable();
   }
 
   const files = collectFiles(args.path);

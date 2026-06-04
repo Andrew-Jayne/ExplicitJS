@@ -21,14 +21,8 @@ deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne
 ```
 
 Available tags are on the [Releases page](https://github.com/Andrew-Jayne/ExplicitJS/releases).
-You can also pin to a specific commit SHA for full immutability:
 
-```bash
-deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/<commit-sha>/src/cli.ts <path-to-scan>
-```
-
-Deno caches the source after the first fetch, so the URL only resolves once
-per pinned version.
+Deno caches the source after the first fetch, so the URL only resolves once per pinned version.
 
 **Shorter command** — install any of the above URLs as a Deno-managed shim:
 
@@ -39,7 +33,7 @@ explicitjs <path-to-scan>
 
 `<path-to-scan>` is whatever file or directory you want analyzed — `src/`, `app.ts`, `.`, etc.
 
-`--allow-env` is needed because the `typescript` package reads `TSC_*` watch-mode variables at init — we never use them, but Deno blocks the read without the flag.
+`--allow-env` is needed because the `typescript` package reads `TSC_*` watch-mode variables at init: we never use them, but Deno blocks the read without the flag.
 
 ## What it catches
 
@@ -57,8 +51,7 @@ explicitjs <path-to-scan>
 | **Single-use variables**                                                   | `const r = compute(); return r;` — pointless indirection                | inline the expression                                                   |
 | **Single-use functions**                                                   | a helper called exactly once                                            | inline at the call site                                                 |
 
-It parses JavaScript and TypeScript (including JSX/TSX) with the TypeScript
-compiler, so no build step or `tsconfig` is required to analyze a file.
+It parses JavaScript and TypeScript (including JSX/TSX) with the TypeScript compiler, so no build step or `tsconfig` is required to analyze a file.
 
 ## Usage
 
@@ -66,10 +59,6 @@ compiler, so no build step or `tsconfig` is required to analyze a file.
 # Analyze a file or a directory
 explicitjs src/
 explicitjs app.ts
-
-# JSON / CSV output (for CI / tooling)
-explicitjs . --format json
-explicitjs . --format csv
 
 # Statistics only
 explicitjs . --stats-only
@@ -83,10 +72,6 @@ explicitjs . --include-extra arrow
 # Redirect the report to a file with your shell
 explicitjs src/ > report.txt
 explicitjs src/ --format json > report.json
-
-# Print version / help
-explicitjs --version
-explicitjs --help
 ```
 
 ExplicitJS exits non-zero when any check is found, so it works as a CI gate.
@@ -94,7 +79,8 @@ It analyzes `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.mts`, `.cts` and ski
 
 ## Configuration
 
-ExplicitJS reads defaults from a `.explicitrc.json` file — discovered by walking up from the analyzed path, or pointed at explicitly with `--config`. **Command-line flags always override the config file**; the two list settings (`exclude-type` and `include-extra`) are merged with their CLI counterparts.
+ExplicitJS reads defaults from a `.explicitrc.json` file — discovered by walking up from the analyzed path, or pointed at explicitly with `--config`.
+**Command-line flags always override the config file**; the two list settings (`exclude-type` and `include-extra`) are merged with their CLI counterparts.
 
 ```jsonc
 // .explicitrc.json
@@ -110,24 +96,16 @@ ExplicitJS reads defaults from a `.explicitrc.json` file — discovered by walki
 Two lists drive what runs:
 
 - **`exclude-type`** turns a check off entirely.
-- **`include-extra`** opts into the stricter variant of an "exotic" check. By
-  default `arrow` only flags _ambiguous_ (implicit-boolean) arrow bodies;
-  listing it here flags **every** arrow / function expression. (If a check
-  appears in both lists, `exclude-type` wins — it is filtered out after
-  analysis.)
+- **`include-extra`** opts into the stricter variant of an "exotic" check. By default `arrow` only flags _ambiguous_ (implicit-boolean) arrow bodies; listing it here flags **every** arrow / function expression. (If a check appears in both lists, `exclude-type` wins — it is filtered out after analysis.)
 
-See [explicit.example.json](explicit.example.json) for every setting and its
-default.
+See [explicit.example.json](explicit.example.json) for every setting and its default.
 
 ### What is exempt
 
 The single-use checks deliberately ignore a few legitimate patterns:
 
-- **Constants** — `UPPER_SNAKE_CASE` names are never flagged as single-use
-  variables; a named constant documents intent even when used once.
-- **Exports** — exported names (`export function`, `export const`,
-  `export { … }`, `export default x`) are never flagged as single-use, since
-  references from outside the file are invisible to a single-file analysis.
+- **Constants** — `UPPER_SNAKE_CASE` names are never flagged as single-use variables; a named constant documents intent even when used once.
+- **Exports** — exported names (`export function`, `export const`, `export { … }`, `export default x`) are never flagged as single-use, since references from outside the file are invisible to a single-file analysis.
 - **Entry points** — functions named `main` are never flagged as single-use functions (the conventional CLI entry).
 
 ## Output formats
@@ -138,8 +116,7 @@ The single-use checks deliberately ignore a few legitimate patterns:
 
 ## Philosophy
 
-The Zen of Python says "explicit is better than implicit." This tool enforces
-that line in JavaScript and TypeScript.
+The Zen of Python says "explicit is better than implicit." This tool enforces that line in JavaScript and TypeScript.
 
 Most of the patterns flagged here exist for one reason: saving keystrokes. That trade made more sense when you were typing every character yourself. It makes no sense now. Your editor has autocomplete. Your AI agent will write the verbose version just as fast as the clever one. The keystrokes are free. The ambiguity is not.
 
@@ -147,31 +124,14 @@ The goal is not style, it's semantic precision: code should say what it means so
 
 ## Development
 
-ExplicitJS is a Deno project — `deno.json` is the only build manifest. There is no `package.json`, no `node_modules`, no bundle step, and no published npm or JSR package. Users `deno run` straight from this repo.
-
 ```bash
 deno task start <path-to-scan>   # run the CLI against any source
-deno task test                   # run the fixture harness
+deno task test                   # run the test suite
 deno task check                  # type-check
 ```
 
-Tests live in [test/fixtures/](test/fixtures/) as annotated source files; the
-harness in [test/harness.test.ts](test/harness.test.ts) asserts the analyzer's
-output matches the inline `// expect:` markers exactly.
-
-### Cutting a release
-
-1. Bump `VERSION` in [src/cli.ts](src/cli.ts) and `version` in
-   [deno.json](deno.json).
-2. Commit, then tag: `git tag v1.2.3 && git push --tags`.
-
-That's the whole release process. The tag _is_ the artifact — users who want
-to pin instead of tracking `main` point Deno at the tag URL:
-
-```bash
-deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1.2.3/src/cli.ts <path-to-scan>
-```
+Tests live in [test/checks.test.ts](test/checks.test.ts) as table-driven cases: each is a self-contained source snippet paired with the exact `{ checkType: count }` it should produce. To add coverage, add a case to the `cases` array.
 
 ## Requirements
 
-Users need [Deno](https://deno.com/) >= 2.8 installed. Building from source needs the same.
+[Deno](https://deno.com/) >= 2.8 installed. Building from source needs the same.

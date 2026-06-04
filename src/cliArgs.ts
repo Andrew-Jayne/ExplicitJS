@@ -8,10 +8,10 @@ import {
   CHECK_TYPES,
   CheckType,
   EXTRA_CHECKS,
-  REPORT_FORMATS,
-  ReportFormat,
   isCheckType,
   isReportFormat,
+  REPORT_FORMATS,
+  ReportFormat,
 } from "./constructs.ts";
 
 export interface Args {

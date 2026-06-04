@@ -9,7 +9,7 @@
  */
 
 import ts from "npm:typescript@^6.0.3";
-import { CheckType, EXTRA_CHECKS, type StyleCheck } from "./constructs.ts";
+import { CheckType, type StyleCheck } from "./constructs.ts";
 
 const MAX_CODE_LENGTH = 100;
 
@@ -31,13 +31,12 @@ const LOGICAL_TOKENS: ReadonlySet<ts.SyntaxKind> = new Set([
   ts.SyntaxKind.BarBarToken,
 ]);
 
-const CONTEXT_TEMPLATES: Partial<Record<CheckType, (code: string) => string>> =
-  {
-    [CheckType.IF]: (code) => `if (${code})`,
-    [CheckType.WHILE]: (code) => `while (${code})`,
-    [CheckType.ASSERT]: (code) => `assert(${code})`,
-    [CheckType.ARROW]: (code) => `() => ${code}`,
-  };
+const CONTEXT_TEMPLATES: Partial<Record<CheckType, (code: string) => string>> = {
+  [CheckType.IF]: (code) => `if (${code})`,
+  [CheckType.WHILE]: (code) => `while (${code})`,
+  [CheckType.ASSERT]: (code) => `assert(${code})`,
+  [CheckType.ARROW]: (code) => `() => ${code}`,
+};
 
 function truncate(code: string): string {
   const collapsed = code.replace(/\s+/g, " ");

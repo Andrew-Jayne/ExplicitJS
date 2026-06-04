@@ -74,10 +74,11 @@ export class Colors {
   static readonly WHITE = "\x1b[97m";
   static readonly GRAY = "\x1b[90m";
 
-  private static enabled = true;
+  private static enabled = false;
 
-  static disable(): void {
-    Colors.enabled = false;
+  /** Opt in to color. Call once when stdout is a TTY and --no-color was not set. */
+  static enable(): void {
+    Colors.enabled = true;
   }
 
   /** Wrap `text` in `code`/RESET, but only when colors are enabled. */
@@ -86,9 +87,5 @@ export class Colors {
       return text;
     }
     return `${code}${text}${Colors.RESET}`;
-  }
-
-  static stripColors(text: string): string {
-    return text.replace(/\x1b\[[0-9;]+m/g, "");
   }
 }

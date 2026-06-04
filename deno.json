@@ -5,7 +5,7 @@
   "tasks": {
     "start": "deno run --allow-read --allow-env src/cli.ts",
     "test": "deno test --allow-read --allow-env",
-    "check": "deno check src/cli.ts test/harness.test.ts"
+    "check": "deno check src/cli.ts test/checks.test.ts"
   },
   "compilerOptions": {
     "strict": true,
@@ -16,12 +16,12 @@
     "lineWidth": 100,
     "indentWidth": 2,
     "semiColons": true,
-    "singleQuote": false
+    "singleQuote": false,
+    "exclude": ["*.md"]
   },
   "lint": {
     "rules": {
       "tags": ["recommended"]
     }
-  },
-  "exclude": ["test/fixtures"]
+  }
 }

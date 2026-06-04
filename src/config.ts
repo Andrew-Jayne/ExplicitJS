@@ -17,7 +17,7 @@ import {
   ReportFormat,
   isCheckType,
   isReportFormat,
-} from "@/constructs.js";
+} from "./constructs.ts";
 
 export interface Config {
   format?: ReportFormat;

@@ -5,13 +5,21 @@
  * so it works as a CI gate).
  */
 
-import { existsSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
-import { type Args } from "@/cliArgs.js";
-import { type Config, loadConfig } from "@/config.js";
-import { Colors, ReportFormat, type StyleCheck } from "@/constructs.js";
-import { analyzeFile } from "@/fileHandlers.js";
-import { formatReport, generateStatisticsReport } from "@/reporters.js";
+import { type Args } from "./cliArgs.ts";
+import { type Config, loadConfig } from "./config.ts";
+import { Colors, ReportFormat, type StyleCheck } from "./constructs.ts";
+import { analyzeFile } from "./fileHandlers.ts";
+import { formatReport, generateStatisticsReport } from "./reporters.ts";
+
+const encoder = new TextEncoder();
+function writeErr(message: string): void {
+  Deno.stderr.writeSync(encoder.encode(message));
+}
+function writeOut(message: string): void {
+  Deno.stdout.writeSync(encoder.encode(message));
+}
 
 const SOURCE_EXTENSIONS: ReadonlySet<string> = new Set([
   ".js",
@@ -123,24 +131,24 @@ function collectFiles(target: string): string[] {
 
 export function run(args: Args): number {
   if (args.path === undefined) {
-    process.stderr.write("error: no path provided (see --help)\n");
+    writeErr("error: no path provided (see --help)\n");
     return 1;
   }
   if (existsSync(args.path) === false) {
-    process.stderr.write(`error: path does not exist: ${args.path}\n`);
+    writeErr(`error: path does not exist: ${args.path}\n`);
     return 1;
   }
 
   const config = loadConfig(args.path, args.config);
   const settings = resolveSettings(args, config);
 
-  if (settings.noColor === true || args.output !== undefined || process.stdout.isTTY !== true) {
+  if (settings.noColor === true || Deno.stdout.isTerminal() === false) {
     Colors.disable();
   }
 
   const files = collectFiles(args.path);
   if (files.length === 0) {
-    process.stderr.write("error: no JavaScript/TypeScript files found to analyze\n");
+    writeErr("error: no JavaScript/TypeScript files found to analyze\n");
     return 1;
   }
 
@@ -166,11 +174,7 @@ export function run(args: Args): number {
     report = formatReport(allChecks, settings.outputFormat);
   }
 
-  if (args.output !== undefined) {
-    writeFileSync(args.output, Colors.stripColors(report));
-  } else {
-    process.stdout.write(report + "\n");
-  }
+  writeOut(report + "\n");
 
   if (allChecks.length > 0) {
     return 1;

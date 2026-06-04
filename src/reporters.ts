@@ -3,7 +3,7 @@
  * report.
  */
 
-import { CheckType, Colors, ReportFormat, type StyleCheck } from "@/constructs.js";
+import { CheckType, Colors, ReportFormat, type StyleCheck } from "./constructs.ts";
 
 const TYPE_COLORS: Record<string, string> = {
   [CheckType.IF]: Colors.YELLOW,

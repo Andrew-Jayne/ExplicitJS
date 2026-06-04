@@ -12,7 +12,7 @@ import {
   ReportFormat,
   isCheckType,
   isReportFormat,
-} from "@/constructs.js";
+} from "./constructs.ts";
 
 export interface Args {
   path?: string;
@@ -20,7 +20,6 @@ export interface Args {
   format?: ReportFormat;
   excludeType?: string[];
   includeExtra?: string[];
-  output?: string;
   statsOnly?: boolean;
   noColor?: boolean;
   showHelp: boolean;
@@ -44,7 +43,6 @@ Options:
                              occurrence, not just ambiguous ones (repeatable):
                              ${[...EXTRA_CHECKS].join(", ")}
       --config <path>        Path to a config file (package.json / .explicitrc.json)
-  -o, --output <path>        Write report to a file instead of stdout
       --stats-only           Show only statistics, not individual checks
       --no-color             Disable colored output
       --version              Print version and exit
@@ -53,11 +51,14 @@ Options:
 Check types:
   ${CHECK_TYPES.join(", ")}
 
+Redirect output to a file with your shell:
+  explicitjs src/ > report.txt
+
 Examples:
-  npx github:Andrew-Jayne/ExplicitJS src/
-  npx github:Andrew-Jayne/ExplicitJS app.ts --format json
-  npx github:Andrew-Jayne/ExplicitJS . --exclude-type ternary --exclude-type loose_equality
-  npx github:Andrew-Jayne/ExplicitJS . --include-extra arrow`;
+  explicitjs src/
+  explicitjs app.ts --format json
+  explicitjs . --exclude-type ternary --exclude-type loose_equality
+  explicitjs . --include-extra arrow`;
 
 export function helpText(): string {
   return HELP_TEXT;
@@ -140,10 +141,6 @@ export function parseArgs(argv: readonly string[]): Args {
       }
       case "--config":
         args.config = next();
-        break;
-      case "-o":
-      case "--output":
-        args.output = next();
         break;
       case "--stats-only":
         args.statsOnly = true;

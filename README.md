@@ -2,22 +2,58 @@
 
 A semantic clarity enforcer for production JavaScript & TypeScript.
 
-ExplicitJS flags code where the author's intent is ambiguous — patterns that
-force the next reader (or LLM) to guess what was meant instead of knowing. It is
-the JS/TS counterpart of [`explicit`](https://github.com/Andrew-Jayne/explicit)
-for Python.
+ExplicitJS flags code where the author's intent is ambiguous — patterns that force the next reader (or LLM) to guess what was meant instead of knowing. It is the JS/TS counterpart of [`explicit`](https://github.com/Andrew-Jayne/explicit)for Python.
 
 ## Quick start
 
-No install required — run it straight from GitHub with `npx` (needs Node.js >= 24):
+ExplicitJS is run with [Deno](https://deno.com/), straight from this
+repository — there is no build artifact, no package registry, and no install
+step. Point Deno at the source entry point and Deno fetches the import graph
+and caches it.
+
+**Latest (tracks `main`):**
 
 ```bash
-npx github:Andrew-Jayne/ExplicitJS src/
+deno run --allow-read --allow-env \
+  https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/main/src/cli.ts \
+  <path-to-scan>
 ```
 
-> This is the intended way to run it — there's nothing to publish or install.
-> `npx` clones the repo, installs its deps, and builds it automatically (via the
-> `prepare` script). The first run is slower while it builds; npx caches it after.
+**Pinned to a release tag** (recommended — reproducible, immune to future
+commits on `main`):
+
+```bash
+deno run --allow-read --allow-env \
+  https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1.0.0/src/cli.ts \
+  <path-to-scan>
+```
+
+Available tags are on the [Releases page](https://github.com/Andrew-Jayne/ExplicitJS/releases).
+You can also pin to a specific commit SHA for full immutability:
+
+```bash
+deno run --allow-read --allow-env \
+  https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/<commit-sha>/src/cli.ts \
+  <path-to-scan>
+```
+
+Deno caches the source after the first fetch, so the URL only resolves once
+per pinned version.
+
+**Shorter command** — install any of the above URLs as a Deno-managed shim:
+
+```bash
+deno install -g --allow-read --allow-env -n explicitjs \
+  https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1.0.0/src/cli.ts
+explicitjs <path-to-scan>
+```
+
+`<path-to-scan>` is whatever file or directory you want analyzed — `src/`,
+`app.ts`, `.`, etc.
+
+`--allow-env` is needed because the `typescript` package reads `TSC_*`
+watch-mode variables at init — we never use them, but Deno blocks the read
+without the flag.
 
 ## What it catches
 
@@ -40,19 +76,6 @@ compiler, so no build step or `tsconfig` is required to analyze a file.
 
 ## Usage
 
-Run it with `npx github:Andrew-Jayne/ExplicitJS <path> [options]`. The examples
-below use `explicitjs` for brevity — either install it globally:
-
-```bash
-npm install -g github:Andrew-Jayne/ExplicitJS
-```
-
-…or alias the npx call:
-
-```bash
-alias explicitjs="npx github:Andrew-Jayne/ExplicitJS"
-```
-
 ```bash
 # Analyze a file or a directory
 explicitjs src/
@@ -71,8 +94,9 @@ explicitjs . --exclude-type ternary --exclude-type loose_equality
 # Strict mode: flag every arrow / function expression, not just ambiguous ones
 explicitjs . --include-extra arrow
 
-# Write the report to a file (colors stripped)
-explicitjs . -o report.txt
+# Redirect the report to a file with your shell
+explicitjs src/ > report.txt
+explicitjs src/ --format json > report.json
 
 # Print version / help
 explicitjs --version
@@ -152,16 +176,43 @@ guessing.
 
 ## Development
 
+ExplicitJS is a Deno project — `deno.json` is the only build manifest. There is
+no `package.json`, no `node_modules`, no bundle step, and no published npm or
+JSR package. Users `deno run` straight from this repo.
+
 ```bash
-npm install
-npm run build      # compile src/ -> dist/ (tsc + tsc-alias for the @/ path alias)
-npm test           # build fixtures harness and run node --test
+deno task start <path-to-scan>   # run the CLI against any source
+deno task test                   # run the fixture harness
+deno task check                  # type-check
 ```
 
 Tests live in [test/fixtures/](test/fixtures/) as annotated source files; the
 harness in [test/harness.test.ts](test/harness.test.ts) asserts the analyzer's
 output matches the inline `// expect:` markers exactly.
 
+### Cutting a release
+
+1. Bump `VERSION` in [src/cli.ts](src/cli.ts) and `version` in
+   [deno.json](deno.json).
+2. Commit, then tag: `git tag v1.2.3 && git push --tags`.
+
+That's the whole release process. The tag *is* the artifact — users who want
+to pin instead of tracking `main` point Deno at the tag URL:
+
+```bash
+deno run --allow-read --allow-env \
+  https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1.2.3/src/cli.ts \
+  <path-to-scan>
+```
+
+No bundle, no upload, no release-time secrets — the only attack surface on
+this side is the commits themselves, which are visible in `git log`. The one
+runtime dependency, `npm:typescript`, is fetched by each user's Deno on first
+run and cached. If npm or TypeScript itself is ever compromised the whole JS
+ecosystem has a problem — this analyzer included — and the right response is
+to pin a new known-good version, not to fight the shape of the registry.
+
 ## Requirements
 
-Node.js >= 24.
+Users need [Deno](https://deno.com/) >= 2.8 installed. Building from source
+needs the same.

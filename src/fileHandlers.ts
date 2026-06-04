@@ -7,10 +7,10 @@
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import ts from "typescript";
-import { analyzeAst } from "@/codeVisitor.js";
-import { findSingleUse } from "@/singleUse.js";
-import { type StyleCheck } from "@/constructs.js";
+import ts from "npm:typescript@^6.0.3";
+import { analyzeAst } from "./codeVisitor.ts";
+import { findSingleUse } from "./singleUse.ts";
+import { type StyleCheck } from "./constructs.ts";
 
 const TSX_EXTENSIONS: ReadonlySet<string> = new Set([".tsx", ".jsx"]);
 

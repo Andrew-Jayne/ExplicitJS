@@ -12,8 +12,8 @@
  *     from outside the file are invisible to a single-file analysis.
  */
 
-import ts from "typescript";
-import { CheckType, type StyleCheck } from "@/constructs.js";
+import ts from "npm:typescript@^6.0.3";
+import { CheckType, type StyleCheck } from "./constructs.ts";
 
 const EXCLUDED_NAMES: ReadonlySet<string> = new Set(["_"]);
 

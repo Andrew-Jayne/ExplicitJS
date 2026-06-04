@@ -8,8 +8,8 @@
  * Scope-level checks (single-use var/func) live in `singleUse.ts`.
  */
 
-import ts from "typescript";
-import { CheckType, EXTRA_CHECKS, type StyleCheck } from "@/constructs.js";
+import ts from "npm:typescript@^6.0.3";
+import { CheckType, EXTRA_CHECKS, type StyleCheck } from "./constructs.ts";
 
 const MAX_CODE_LENGTH = 100;
 

@@ -1,57 +1,43 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S deno run --allow-read
 /**
- * Executable entry point for ExplicitJS (the npx target).
+ * Executable entry point for ExplicitJS.
  */
 
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
-import { ArgError, helpText, parseArgs } from "@/cliArgs.js";
-import { run } from "@/main.js";
+import { ArgError, helpText, parseArgs } from "./cliArgs.ts";
+import { run } from "./main.ts";
 
-function packageVersion(): string {
-  try {
-    const pkg: unknown = JSON.parse(
-      readFileSync(
-        path.join(
-          path.dirname(fileURLToPath(import.meta.url)),
-          "..",
-          "package.json",
-        ),
-        "utf-8",
-      ),
-    );
-    if (typeof pkg === "object" && pkg !== null && "version" in pkg) {
-      return String((pkg as { version: unknown }).version);
-    }
-  } catch {
-    // fall through
-  }
-  return "unknown";
+const VERSION = "1.0.0";
+
+const encoder = new TextEncoder();
+function writeErr(message: string): void {
+  Deno.stderr.writeSync(encoder.encode(message));
+}
+function writeOut(message: string): void {
+  Deno.stdout.writeSync(encoder.encode(message));
 }
 
 function main(): void {
   let args;
   try {
-    args = parseArgs(process.argv.slice(2));
+    args = parseArgs(Deno.args);
   } catch (error) {
     if (error instanceof ArgError) {
-      process.stderr.write(`error: ${error.message}\n`);
-      process.exit(2);
+      writeErr(`error: ${error.message}\n`);
+      Deno.exit(2);
     }
     throw error;
   }
 
   if (args.showHelp === true) {
-    process.stdout.write(helpText() + "\n");
-    process.exit(0);
+    writeOut(helpText() + "\n");
+    Deno.exit(0);
   }
   if (args.showVersion === true) {
-    process.stdout.write(`ExplicitJS ${packageVersion()}\n`);
-    process.exit(0);
+    writeOut(`ExplicitJS ${VERSION}\n`);
+    Deno.exit(0);
   }
 
-  process.exit(run(args));
+  Deno.exit(run(args));
 }
 
 main();

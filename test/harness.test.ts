@@ -32,14 +32,14 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { CHECK_TYPES } from "@/constructs.js";
-import { analyzeSource } from "@/fileHandlers.js";
+import { CHECK_TYPES } from "../src/constructs.ts";
+import { analyzeSource } from "../src/fileHandlers.ts";
 
 const VALID_MODES = new Set(["default", "extra"]);
 const VALID_CHECK_TYPES = new Set<string>(CHECK_TYPES);
 
 const HARNESS_DIR = path.dirname(fileURLToPath(import.meta.url));
-const FIXTURES_DIR = path.resolve(HARNESS_DIR, "..", "..", "test", "fixtures");
+const FIXTURES_DIR = path.resolve(HARNESS_DIR, "fixtures");
 
 const HEADER_RE = /\/\/\s*explicit-test:\s*(.*)$/;
 const EXPECT_RE = /\/\/\s*expect:\s*(.*?)\s*$/;

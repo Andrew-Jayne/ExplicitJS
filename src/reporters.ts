@@ -3,7 +3,12 @@
  * report.
  */
 
-import { CheckType, Colors, ReportFormat, type StyleCheck } from "./constructs.ts";
+import {
+  CheckType,
+  Colors,
+  ReportFormat,
+  type StyleCheck,
+} from "./constructs.ts";
 
 const TYPE_COLORS: Record<string, string> = {
   [CheckType.IF]: Colors.YELLOW,
@@ -123,7 +128,9 @@ function formatText(checks: StyleCheck[]): string {
   for (const check of [...checks].sort(sortByFileLine)) {
     if (check.file !== currentFile) {
       currentFile = check.file;
-      output.push("\n" + Colors.paint(Colors.BOLD + Colors.BLUE, `📄 ${check.file}`));
+      output.push(
+        "\n" + Colors.paint(Colors.BOLD + Colors.BLUE, `📄 ${check.file}`),
+      );
     }
     output.push(
       "  " +
@@ -140,7 +147,9 @@ function formatText(checks: StyleCheck[]): string {
         " " +
         Colors.paint(Colors.WHITE, check.code),
     );
-    output.push("    " + Colors.paint(Colors.DIM, "Context:") + " " + check.context);
+    output.push(
+      "    " + Colors.paint(Colors.DIM, "Context:") + " " + check.context,
+    );
     output.push("");
   }
 
@@ -164,7 +173,9 @@ export function generateStatisticsReport(
   fileCount: number,
 ): string {
   const output: string[] = [];
-  output.push("\n" + Colors.paint(Colors.BOLD + Colors.CYAN, "📊 Check Statistics"));
+  output.push(
+    "\n" + Colors.paint(Colors.BOLD + Colors.CYAN, "📊 Check Statistics"),
+  );
   output.push(Colors.paint(Colors.GRAY, "═".repeat(50)));
   output.push(
     Colors.paint(Colors.BOLD, "Total files analyzed:") +
@@ -203,7 +214,10 @@ export function generateStatisticsReport(
           " " +
           Colors.paint(Colors.GRAY, `(${percentage.toFixed(1).padStart(5)}%)`) +
           " " +
-          Colors.paint(typeColor(checkType), "█".repeat(Math.floor(percentage / 2))),
+          Colors.paint(
+            typeColor(checkType),
+            "█".repeat(Math.floor(percentage / 2)),
+          ),
       );
     }
   }

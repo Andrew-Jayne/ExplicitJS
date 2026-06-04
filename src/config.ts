@@ -36,7 +36,10 @@ function findUp(start: string, filename: string): string | undefined {
   let current = directoryOf(start);
   for (;;) {
     const candidate = path.join(current, filename);
-    if (existsSync(candidate) === true && statSync(candidate).isFile() === true) {
+    if (
+      existsSync(candidate) === true &&
+      statSync(candidate).isFile() === true
+    ) {
       return candidate;
     }
     const parent = path.dirname(current);
@@ -84,7 +87,9 @@ function applyRcFile(filepath: string, config: Config): void {
 }
 
 function isEnabledExtra(value: string): boolean {
-  return isCheckType(value) === true && EXTRA_CHECKS.has(value as CheckType) === true;
+  return (
+    isCheckType(value) === true && EXTRA_CHECKS.has(value as CheckType) === true
+  );
 }
 
 function applyTable(table: Record<string, unknown>, config: Config): void {

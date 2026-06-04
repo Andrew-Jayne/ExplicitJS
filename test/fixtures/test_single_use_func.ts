@@ -1,5 +1,6 @@
 export function caller(): number {
-  function helper(): number { // expect: single_use_func
+  function helper(): number {
+    // expect: single_use_func
     return 1;
   }
   return helper();

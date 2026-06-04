@@ -64,10 +64,7 @@ export function helpText(): string {
   return HELP_TEXT;
 }
 
-function requireValue(
-  flag: string,
-  value: string | undefined,
-): string {
+function requireValue(flag: string, value: string | undefined): string {
   if (value === undefined) {
     throw new ArgError(`Option ${flag} requires a value`);
   }
@@ -131,7 +128,10 @@ export function parseArgs(argv: readonly string[]): Args {
       }
       case "--include-extra": {
         const value = next();
-        if (isCheckType(value) === false || EXTRA_CHECKS.has(value as CheckType) === false) {
+        if (
+          isCheckType(value) === false ||
+          EXTRA_CHECKS.has(value as CheckType) === false
+        ) {
           throw new ArgError(
             `Invalid extra check '${value}'. Choose one of: ${[...EXTRA_CHECKS].join(", ")}`,
           );

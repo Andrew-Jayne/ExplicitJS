@@ -57,7 +57,10 @@ interface Settings {
   includeExtra: Set<string>;
 }
 
-function resolveBool(cli: boolean | undefined, config: boolean | undefined): boolean {
+function resolveBool(
+  cli: boolean | undefined,
+  config: boolean | undefined,
+): boolean {
   if (cli !== undefined) {
     return cli;
   }
@@ -67,7 +70,10 @@ function resolveBool(cli: boolean | undefined, config: boolean | undefined): boo
   return false;
 }
 
-function mergeList(cli: string[] | undefined, config: string[] | undefined): string[] {
+function mergeList(
+  cli: string[] | undefined,
+  config: string[] | undefined,
+): string[] {
   const merged: string[] = [];
   if (config !== undefined) {
     merged.push(...config);
@@ -164,7 +170,9 @@ export function run(args: Args): number {
 
   if (settings.excludeType.length > 0) {
     const excluded = new Set(settings.excludeType);
-    allChecks = allChecks.filter((check) => excluded.has(check.checkType) === false);
+    allChecks = allChecks.filter(
+      (check) => excluded.has(check.checkType) === false,
+    );
   }
 
   let report: string;

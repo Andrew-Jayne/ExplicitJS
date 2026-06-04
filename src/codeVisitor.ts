@@ -31,12 +31,13 @@ const LOGICAL_TOKENS: ReadonlySet<ts.SyntaxKind> = new Set([
   ts.SyntaxKind.BarBarToken,
 ]);
 
-const CONTEXT_TEMPLATES: Partial<Record<CheckType, (code: string) => string>> = {
-  [CheckType.IF]: (code) => `if (${code})`,
-  [CheckType.WHILE]: (code) => `while (${code})`,
-  [CheckType.ASSERT]: (code) => `assert(${code})`,
-  [CheckType.ARROW]: (code) => `() => ${code}`,
-};
+const CONTEXT_TEMPLATES: Partial<Record<CheckType, (code: string) => string>> =
+  {
+    [CheckType.IF]: (code) => `if (${code})`,
+    [CheckType.WHILE]: (code) => `while (${code})`,
+    [CheckType.ASSERT]: (code) => `assert(${code})`,
+    [CheckType.ARROW]: (code) => `() => ${code}`,
+  };
 
 function truncate(code: string): string {
   const collapsed = code.replace(/\s+/g, " ");
@@ -116,7 +117,10 @@ export class CodeVisitor {
   private visit(node: ts.Node): void {
     switch (node.kind) {
       case ts.SyntaxKind.IfStatement:
-        this.implicitBoolCheck((node as ts.IfStatement).expression, CheckType.IF);
+        this.implicitBoolCheck(
+          (node as ts.IfStatement).expression,
+          CheckType.IF,
+        );
         break;
       case ts.SyntaxKind.WhileStatement:
         this.implicitBoolCheck(
@@ -150,7 +154,9 @@ export class CodeVisitor {
         break;
       case ts.SyntaxKind.ArrowFunction:
       case ts.SyntaxKind.FunctionExpression:
-        this.visitFunctionLike(node as ts.ArrowFunction | ts.FunctionExpression);
+        this.visitFunctionLike(
+          node as ts.ArrowFunction | ts.FunctionExpression,
+        );
         break;
       default:
         break;
@@ -265,7 +271,10 @@ export class CodeVisitor {
   ): void {
     for (const side of [node.left, node.right]) {
       const inner = unwrapParens(side);
-      if (ts.isBinaryExpression(inner) === true && inner.operatorToken.kind === op) {
+      if (
+        ts.isBinaryExpression(inner) === true &&
+        inner.operatorToken.kind === op
+      ) {
         this.collectChain(inner, op, out);
       } else {
         out.push(side);

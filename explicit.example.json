@@ -1,10 +1,9 @@
 {
   "//": "Example .explicitrc.json. Drop this file at the root of the project you want ExplicitJS to analyze (it walks up from the analyzed path looking for it). Every key is optional; the value shown is the default used when the key is omitted. Command-line flags always override these values, and the two list settings (exclude-type, include-extra) are merged with their --exclude-type / --include-extra counterparts on the CLI.",
-
   "format": "text",
-
+  "exclude-type": [],
   "//exclude-type": [
-    "Turn checks off entirely. Defaults to [] (nothing excluded). Each value:",
+    "Turn checks off entirely. Defaults to [] (nothing excluded).",
     "  if                  - truthiness test in an if:        if (items)",
     "  while               - truthiness test in while/do:     while (queue)",
     "  assert              - truthiness in assert/console.assert/assert.ok",
@@ -19,16 +18,13 @@
     "  single_use_var      - a variable assigned once and read once",
     "  single_use_func     - a function defined once and called once"
   ],
-  "exclude-type": [],
-
+  "include-extra": [],
   "//include-extra": [
     "Opt into stricter variants of the 'exotic' checks. By default these only",
     "flag an ambiguous (implicit-boolean) use; listing a check here flags",
     "EVERY occurrence. Defaults to []. Valid values:",
     "  arrow - flag all arrow / function expressions, not just ambiguous ones"
   ],
-  "include-extra": [],
-
   "no-color": false,
   "stats-only": false
 }

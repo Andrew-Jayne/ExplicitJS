@@ -85,7 +85,11 @@ function parseHeader(spec: FixtureSpec, body: string): void {
   }
 }
 
-function parseExpectation(spec: FixtureSpec, lineNumber: number, expr: string): void {
+function parseExpectation(
+  spec: FixtureSpec,
+  lineNumber: number,
+  expr: string,
+): void {
   for (const rawItem of expr.split(",")) {
     const item = rawItem.trim();
     if (item === "") {
@@ -96,7 +100,9 @@ function parseExpectation(spec: FixtureSpec, lineNumber: number, expr: string): 
     const itemMode = at === -1 ? "" : item.slice(at + 1).trim();
 
     if (VALID_CHECK_TYPES.has(name) === false) {
-      throw new Error(`${spec.path}:${lineNumber}: unknown check type '${name}'`);
+      throw new Error(
+        `${spec.path}:${lineNumber}: unknown check type '${name}'`,
+      );
     }
     const targetModes = itemMode === "" ? spec.modes : [itemMode];
     for (const mode of targetModes) {

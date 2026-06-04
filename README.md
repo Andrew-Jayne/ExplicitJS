@@ -43,19 +43,19 @@ explicitjs <path-to-scan>
 
 ## What it catches
 
-| Check | What's ambiguous | What to write instead |
-|---|---|---|
-| **Implicit booleans** in `if` / `while` / `do…while` | `if (items)` — checking length? nullness? | `if (items.length > 0)` or `if (items !== undefined && items !== null)` |
-| **`assert` truthiness** (`assert(x)`, `console.assert(x)`, `assert.ok(x)`) | relies on coercion | `assert(x !== undefined)` |
-| **Ternary expressions** | `cond ? x : y` buries control flow | an explicit `if`/`else` block |
-| **Optional chaining** | `request?.headers?.auth?.token` — is a missing field expected or a bug? | validate the shape once (schema/type), then access directly |
-| **Boolean operators** | `a && b` / `a \|\| b` with non-boolean operands | explicit comparisons for each operand |
-| **Arrow / function expressions** | anonymous logic with no name to describe intent | a named function |
-| **`.filter(Boolean)`** | implicit truthiness as a filter predicate | an explicit predicate, e.g. `.filter((value) => value !== undefined)` |
-| **Loose equality** (`==`, `!=`) | coerces operands silently | `===` / `!==` |
-| **Single-letter names** | `x`, `n`, `e` — no semantic meaning | descriptive names |
-| **Single-use variables** | `const r = compute(); return r;` — pointless indirection | inline the expression |
-| **Single-use functions** | a helper called exactly once | inline at the call site |
+| Check                                                                      | What's ambiguous                                                        | What to write instead                                                   |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| **Implicit booleans** in `if` / `while` / `do…while`                       | `if (items)` — checking length? nullness?                               | `if (items.length > 0)` or `if (items !== undefined && items !== null)` |
+| **`assert` truthiness** (`assert(x)`, `console.assert(x)`, `assert.ok(x)`) | relies on coercion                                                      | `assert(x !== undefined)`                                               |
+| **Ternary expressions**                                                    | `cond ? x : y` buries control flow                                      | an explicit `if`/`else` block                                           |
+| **Optional chaining**                                                      | `request?.headers?.auth?.token` — is a missing field expected or a bug? | validate the shape once (schema/type), then access directly             |
+| **Boolean operators**                                                      | `a && b` / `a \|\| b` with non-boolean operands                         | explicit comparisons for each operand                                   |
+| **Arrow / function expressions**                                           | anonymous logic with no name to describe intent                         | a named function                                                        |
+| **`.filter(Boolean)`**                                                     | implicit truthiness as a filter predicate                               | an explicit predicate, e.g. `.filter((value) => value !== undefined)`   |
+| **Loose equality** (`==`, `!=`)                                            | coerces operands silently                                               | `===` / `!==`                                                           |
+| **Single-letter names**                                                    | `x`, `n`, `e` — no semantic meaning                                     | descriptive names                                                       |
+| **Single-use variables**                                                   | `const r = compute(); return r;` — pointless indirection                | inline the expression                                                   |
+| **Single-use functions**                                                   | a helper called exactly once                                            | inline at the call site                                                 |
 
 It parses JavaScript and TypeScript (including JSX/TSX) with the TypeScript
 compiler, so no build step or `tsconfig` is required to analyze a file.
@@ -99,11 +99,11 @@ ExplicitJS reads defaults from a `.explicitrc.json` file — discovered by walki
 ```jsonc
 // .explicitrc.json
 {
-  "format": "text",                                  // text | json | csv
-  "exclude-type": ["ternary", "single_use_var"],     // turn checks off
-  "include-extra": ["arrow"],                         // opt into stricter checks
+  "format": "text", // text | json | csv
+  "exclude-type": ["ternary", "single_use_var"], // turn checks off
+  "include-extra": ["arrow"], // opt into stricter checks
   "no-color": false,
-  "stats-only": false
+  "stats-only": false,
 }
 ```
 
@@ -111,7 +111,7 @@ Two lists drive what runs:
 
 - **`exclude-type`** turns a check off entirely.
 - **`include-extra`** opts into the stricter variant of an "exotic" check. By
-  default `arrow` only flags *ambiguous* (implicit-boolean) arrow bodies;
+  default `arrow` only flags _ambiguous_ (implicit-boolean) arrow bodies;
   listing it here flags **every** arrow / function expression. (If a check
   appears in both lists, `exclude-type` wins — it is filtered out after
   analysis.)
@@ -165,7 +165,7 @@ output matches the inline `// expect:` markers exactly.
    [deno.json](deno.json).
 2. Commit, then tag: `git tag v1.2.3 && git push --tags`.
 
-That's the whole release process. The tag *is* the artifact — users who want
+That's the whole release process. The tag _is_ the artifact — users who want
 to pin instead of tracking `main` point Deno at the tag URL:
 
 ```bash

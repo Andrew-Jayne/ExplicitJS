@@ -232,7 +232,9 @@ type NamedMemberDeclaration =
   | ts.GetAccessorDeclaration
   | ts.SetAccessorDeclaration;
 
-function isNamedMemberDeclaration(node: ts.Node): node is NamedMemberDeclaration {
+function isNamedMemberDeclaration(
+  node: ts.Node,
+): node is NamedMemberDeclaration {
   return (
     ts.isMethodDeclaration(node) === true ||
     ts.isPropertyDeclaration(node) === true ||
@@ -306,7 +308,10 @@ function flagSingleUseFuncs(
     if (isDunder(name) === true) {
       continue;
     }
-    if (ctx.entryPoints.has(name) === true || ctx.exportedNames.has(name) === true) {
+    if (
+      ctx.entryPoints.has(name) === true ||
+      ctx.exportedNames.has(name) === true
+    ) {
       continue;
     }
     if (positions.length === 1 && (refs.get(name) ?? 0) === 1) {
@@ -354,9 +359,15 @@ function collectExportsFromStatement(
   names: Set<string>,
 ): void {
   if (hasExportKeyword(statement) === true) {
-    if (ts.isFunctionDeclaration(statement) === true && statement.name !== undefined) {
+    if (
+      ts.isFunctionDeclaration(statement) === true &&
+      statement.name !== undefined
+    ) {
       names.add(statement.name.text);
-    } else if (isClassLike(statement) === true && statement.name !== undefined) {
+    } else if (
+      isClassLike(statement) === true &&
+      statement.name !== undefined
+    ) {
       names.add(statement.name.text);
     } else if (ts.isVariableStatement(statement) === true) {
       for (const declaration of statement.declarationList.declarations) {
@@ -389,7 +400,11 @@ function collectExportsFromStatement(
 
 // --- helpers ----------------------------------------------------------------
 
-function record(map: Map<string, Position[]>, name: string, at: Position): void {
+function record(
+  map: Map<string, Position[]>,
+  name: string,
+  at: Position,
+): void {
   const existing = map.get(name);
   if (existing === undefined) {
     map.set(name, [at]);

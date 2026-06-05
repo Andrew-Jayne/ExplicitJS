@@ -292,7 +292,7 @@ function flagSingleUseVars(
         line: at.line,
         column: at.column,
         code: name,
-        context: `Variable '${name}' is only used once - consider inlining the expression`,
+        context: `Variable '${name}' is only used once - consider inlining the expression or marking as a DELIBERTATE_CONSTANT`,
         checkType: CheckType.SINGLE_USE_VAR,
       });
     }

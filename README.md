@@ -8,28 +8,28 @@ ExplicitJS flags code where the author's intent is ambiguous — patterns that f
 
 ExplicitJS is run with [Deno](https://deno.com/), straight from this repository. Point Deno at the source entry point and Deno fetches the import graph and caches it.
 
-**Latest (tracks `main`):**
-
+Install as a Deno shim
 ```bash
-deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/main/src/cli.ts <path-to-scan>
+deno install -g --allow-read --allow-env -n explicitjs https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta1/src/cli.ts
+
+explicitjs <path-to-scan>
+```
+Run directly without an install
+```bash
+alias explictjs="deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/main/src/cli.ts"
+explictjs <path-to-scan>
 ```
 
-**Pinned to a release tag** (recommended — reproducible, immune to future commits on `main`):
-
 ```bash
-deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta1/src/cli.ts <path-to-scan>
+alias explictjs="deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta1/src/cli.ts"
+explictjs <path-to-scan>
 ```
 
 Available tags are on the [Releases page](https://github.com/Andrew-Jayne/ExplicitJS/releases).
 
 Deno caches the source after the first fetch, so the URL only resolves once per pinned version.
 
-**Shorter command** — install any of the above URLs as a Deno-managed shim:
 
-```bash
-deno install -g --allow-read --allow-env -n explicitjs https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta1/src/cli.ts
-explicitjs <path-to-scan>
-```
 
 `<path-to-scan>` is whatever file or directory you want analyzed — `src/`, `app.ts`, `.`, etc.
 

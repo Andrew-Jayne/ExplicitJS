@@ -6,28 +6,28 @@ ExplicitJS flags code where the author's intent is ambiguous — patterns that f
 
 ## Quick start
 
-ExplicitJS is run with [Deno](https://deno.com/), straight from this repository. Point Deno at the source entry point and Deno fetches the import graph and caches it.
+ExplicitJS runs with [Deno](https://deno.com/), straight from this repository — Deno fetches the import graph from the URL and caches it. No build step, no registry.
 
-Install as a Deno shim
+**Install as a Deno shim** (pinned, recommended):
+
 ```bash
 deno install -g --allow-read --allow-env -n explicitjs https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta1/src/cli.ts
+explicitjs <path-to-scan>
+```
+
+**Run without installing, via a shell alias:**
+
+```bash
+# Pinned to a release tag — immutable, auditable at a fixed commit:
+alias explicitjs="deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta1/src/cli.ts"
+
+# Or track the latest on main (mutable):
+alias explicitjs="deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/main/src/cli.ts"
 
 explicitjs <path-to-scan>
 ```
-Run directly without an install
-```bash
-alias explictjs="deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/main/src/cli.ts"
-explictjs <path-to-scan>
-```
 
-```bash
-alias explictjs="deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta1/src/cli.ts"
-explictjs <path-to-scan>
-```
-
-Available tags are on the [Releases page](https://github.com/Andrew-Jayne/ExplicitJS/releases).
-
-Deno caches the source after the first fetch, so the URL only resolves once per pinned version.
+Available tags are on the [Releases page](https://github.com/Andrew-Jayne/ExplicitJS/releases). Deno caches the source after the first fetch, so a pinned URL only resolves once per version.
 
 
 

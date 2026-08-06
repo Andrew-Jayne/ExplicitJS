@@ -10,7 +10,9 @@ const TYPE_COLORS: Record<string, string> = {
   [CheckType.WHILE]: Colors.YELLOW,
   [CheckType.ASSERT]: Colors.RED,
   [CheckType.TERNARY]: Colors.CYAN,
+  [CheckType.NULLISH_COALESCE]: Colors.CYAN,
   [CheckType.OPTIONAL_CHAIN]: Colors.MAGENTA,
+  [CheckType.OPTIONAL_PARAM]: Colors.MAGENTA,
   [CheckType.BOOL_OP]: Colors.BLUE,
   [CheckType.ARROW]: Colors.CYAN,
   [CheckType.FILTER]: Colors.BLUE,
@@ -21,7 +23,11 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 function typeColor(checkType: string): string {
-  return TYPE_COLORS[checkType] ?? Colors.WHITE;
+  const color = TYPE_COLORS[checkType];
+  if (color === undefined) {
+    return Colors.WHITE;
+  }
+  return color;
 }
 
 function sortByFileLine(left: StyleCheck, right: StyleCheck): number {
@@ -225,7 +231,12 @@ export function generateStatisticsReport(
 function countByType(checks: StyleCheck[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const check of checks) {
-    counts.set(check.checkType, (counts.get(check.checkType) ?? 0) + 1);
+    const current = counts.get(check.checkType);
+    if (current === undefined) {
+      counts.set(check.checkType, 1);
+    } else {
+      counts.set(check.checkType, current + 1);
+    }
   }
   return counts;
 }

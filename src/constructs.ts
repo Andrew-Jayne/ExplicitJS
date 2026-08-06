@@ -27,6 +27,7 @@ export enum CheckType {
   WHILE = "while",
   ASSERT = "assert",
   TERNARY = "ternary",
+  NULLISH_COALESCE = "nullish_coalesce",
   OPTIONAL_CHAIN = "optional_chain",
   BOOL_OP = "bool_op",
   ARROW = "arrow",

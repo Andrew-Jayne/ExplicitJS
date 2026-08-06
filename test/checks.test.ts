@@ -30,7 +30,12 @@ const VALID = new Set<string>(CHECK_TYPES);
 function countByType(source: string, extra: CheckType[]): Counts {
   const counts: Counts = {};
   for (const check of analyzeSource(source, "case.ts", { includeExtra: new Set(extra) })) {
-    counts[check.checkType] = (counts[check.checkType] ?? 0) + 1;
+    const current = counts[check.checkType];
+    if (current === undefined) {
+      counts[check.checkType] = 1;
+    } else {
+      counts[check.checkType] = current + 1;
+    }
   }
   return counts;
 }
@@ -100,6 +105,38 @@ const CASES: Case[] = [
     name: "ternary: nested",
     source: "flag ? (score > 0 ? yes : no) : no;",
     expect: { ternary: 2 },
+  },
+
+  // --- nullish coalescing / logical assignment --------------------------
+  {
+    name: "nullish_coalesce: ?? operator",
+    source: "export const port = envPort ?? 3000;",
+    expect: { nullish_coalesce: 1 },
+  },
+  {
+    name: "nullish_coalesce: chain counts per operator",
+    source: "export const value = first ?? second ?? third;",
+    expect: { nullish_coalesce: 2 },
+  },
+  {
+    name: "nullish_coalesce: ??= assignment",
+    source: "count ??= 0;",
+    expect: { nullish_coalesce: 1 },
+  },
+  {
+    name: "bool_op: ||= flags like its expanded form",
+    source: "ready ||= fallback;",
+    expect: { bool_op: 2 },
+  },
+  {
+    name: "bool_op: &&= flags like its expanded form",
+    source: "flags &&= mask;",
+    expect: { bool_op: 2 },
+  },
+  {
+    name: "bool_op: ||= with comparison operand flags only the target",
+    source: "ready ||= count > 0;",
+    expect: { bool_op: 1 },
   },
 
   // --- optional chaining ------------------------------------------------
@@ -379,7 +416,11 @@ for (const testCase of CASES) {
     }
   }
 
+  let extra: CheckType[] = [];
+  if (testCase.extra !== undefined) {
+    extra = testCase.extra;
+  }
   Deno.test(testCase.name, () => {
-    assertEquals(countByType(testCase.source, testCase.extra ?? []), testCase.expect);
+    assertEquals(countByType(testCase.source, extra), testCase.expect);
   });
 }

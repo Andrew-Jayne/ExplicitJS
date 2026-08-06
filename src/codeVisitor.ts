@@ -234,6 +234,43 @@ export class CodeVisitor {
       return;
     }
 
+    if (op === ts.SyntaxKind.QuestionQuestionToken) {
+      this.addCheck(
+        node,
+        CheckType.NULLISH_COALESCE,
+        "Nullish coalescing '??' is an inline if - test === null / === undefined explicitly",
+      );
+      return;
+    }
+    if (op === ts.SyntaxKind.QuestionQuestionEqualsToken) {
+      this.addCheck(
+        node,
+        CheckType.NULLISH_COALESCE,
+        "Nullish assignment '??=' is an inline if - test === null / === undefined explicitly",
+      );
+      return;
+    }
+
+    // `a ||= b` / `a &&= b` are their expanded `a = a || b` forms in disguise,
+    // so their operands get the same implicit-boolean treatment.
+    if (
+      op === ts.SyntaxKind.BarBarEqualsToken ||
+      op === ts.SyntaxKind.AmpersandAmpersandEqualsToken
+    ) {
+      let symbol = "&&=";
+      if (op === ts.SyntaxKind.BarBarEqualsToken) {
+        symbol = "||=";
+      }
+      for (const operand of [node.left, node.right]) {
+        this.implicitBoolCheck(
+          operand,
+          CheckType.BOOL_OP,
+          `... ${symbol} ${truncate(operand.getText(this.sourceFile))} ...`,
+        );
+      }
+      return;
+    }
+
     if (LOGICAL_TOKENS.has(op) === false) {
       return;
     }
@@ -535,12 +572,16 @@ export class CodeVisitor {
     context: string,
     code: string | null = null,
   ): void {
+    let codeText = code;
+    if (codeText === null) {
+      codeText = truncate(node.getText(this.sourceFile));
+    }
     const { line, column } = this.position(node);
     this.checks.push({
       file: this.filename,
       line,
       column,
-      code: code ?? truncate(node.getText(this.sourceFile)),
+      code: codeText,
       context,
       checkType,
     });

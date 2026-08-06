@@ -41,14 +41,17 @@ export function analyzeSource(
     scriptKindFor(filename),
   );
 
-  const checks = analyzeAst(
-    sourceFile,
-    filename,
-    options.includeExtra ?? new Set(),
-  );
-  checks.push(
-    ...findSingleUse(sourceFile, filename, options.entryPoints ?? new Set()),
-  );
+  let includeExtra = options.includeExtra;
+  if (includeExtra === undefined) {
+    includeExtra = new Set();
+  }
+  let entryPoints = options.entryPoints;
+  if (entryPoints === undefined) {
+    entryPoints = new Set();
+  }
+
+  const checks = analyzeAst(sourceFile, filename, includeExtra);
+  checks.push(...findSingleUse(sourceFile, filename, entryPoints));
   return checks;
 }
 

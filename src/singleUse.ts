@@ -334,7 +334,10 @@ function findDeclaringScope(scope: Scope, name: string): Scope | undefined {
 function resolveWrites(scopes: readonly Scope[]): void {
   for (const scope of scopes) {
     for (const write of scope.writes) {
-      const target = findDeclaringScope(scope, write.name) ?? scope;
+      let target = findDeclaringScope(scope, write.name);
+      if (target === undefined) {
+        target = scope;
+      }
       target.declared.add(write.name);
       record(target.varDefs, write.name, write.at);
     }
@@ -448,12 +451,13 @@ function isFlaggableSingleUse(scope: Scope, name: string, positions: Position[])
   if (positions.length !== 1) {
     return false;
   }
-  if ((scope.ownReads.get(name) ?? 0) !== 1) {
+  if (scope.ownReads.get(name) !== 1) {
     return false;
   }
   // A read from a nested scope needs the shared binding: inlining would change
-  // capture or evaluation-order semantics, so the definition is exempt.
-  return (scope.nestedReads.get(name) ?? 0) === 0;
+  // capture or evaluation-order semantics, so the definition is exempt. Counts
+  // start at 1, so an absent entry means zero nested reads.
+  return scope.nestedReads.get(name) === undefined;
 }
 
 function flagScope(scope: Scope, ctx: ScopeContext): void {
@@ -565,7 +569,9 @@ function collectExportsFromStatement(
   ) {
     if (ts.isNamedExports(statement.exportClause) === true) {
       for (const element of statement.exportClause.elements) {
-        names.add((element.propertyName ?? element.name).text);
+        if (element.propertyName !== undefined) {
+          names.add(element.propertyName.text);
+        }
         names.add(element.name.text);
       }
     }
@@ -582,7 +588,12 @@ function collectExportsFromStatement(
 // --- helpers ----------------------------------------------------------------
 
 function bump(counter: Map<string, number>, name: string): void {
-  counter.set(name, (counter.get(name) ?? 0) + 1);
+  const current = counter.get(name);
+  if (current === undefined) {
+    counter.set(name, 1);
+  } else {
+    counter.set(name, current + 1);
+  }
 }
 
 function record(

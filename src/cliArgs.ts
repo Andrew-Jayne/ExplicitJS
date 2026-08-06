@@ -123,7 +123,10 @@ export function parseArgs(argv: readonly string[]): Args {
             `Invalid check type '${value}'. Choose one of: ${CHECK_TYPES.join(", ")}`,
           );
         }
-        (args.excludeType ??= []).push(value);
+        if (args.excludeType === undefined) {
+          args.excludeType = [];
+        }
+        args.excludeType.push(value);
         break;
       }
       case "--include-extra": {
@@ -136,7 +139,10 @@ export function parseArgs(argv: readonly string[]): Args {
             `Invalid extra check '${value}'. Choose one of: ${[...EXTRA_CHECKS].join(", ")}`,
           );
         }
-        (args.includeExtra ??= []).push(value);
+        if (args.includeExtra === undefined) {
+          args.includeExtra = [];
+        }
+        args.includeExtra.push(value);
         break;
       }
       case "--config":

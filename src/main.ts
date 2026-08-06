@@ -84,11 +84,24 @@ function mergeList(
   return merged;
 }
 
+function resolveFormat(
+  cli: ReportFormat | undefined,
+  config: ReportFormat | undefined,
+): ReportFormat {
+  if (cli !== undefined) {
+    return cli;
+  }
+  if (config !== undefined) {
+    return config;
+  }
+  return ReportFormat.TEXT;
+}
+
 function resolveSettings(args: Args, config: Config): Settings {
   return {
     noColor: resolveBool(args.noColor, config.noColor),
     statsOnly: resolveBool(args.statsOnly, config.statsOnly),
-    outputFormat: args.format ?? config.format ?? ReportFormat.TEXT,
+    outputFormat: resolveFormat(args.format, config.format),
     excludeType: mergeList(args.excludeType, config.excludeType),
     includeExtra: new Set(mergeList(args.includeExtra, config.includeExtra)),
   };
@@ -145,7 +158,11 @@ export function run(args: Args): number {
     return 1;
   }
 
-  const config = loadConfig(args.path, args.config ?? null);
+  let configPath: string | null = null;
+  if (args.config !== undefined) {
+    configPath = args.config;
+  }
+  const config = loadConfig(args.path, configPath);
   const settings = resolveSettings(args, config);
 
   if (settings.noColor !== true && Deno.stdout.isTerminal() === true) {

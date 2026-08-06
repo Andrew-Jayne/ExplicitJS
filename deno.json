@@ -1,6 +1,6 @@
 {
   "name": "explicitjs",
-  "version": "1beta1",
+  "version": "1beta2",
   "exports": "./src/cli.ts",
   "tasks": {
     "start": "deno run --allow-read --allow-env src/cli.ts",

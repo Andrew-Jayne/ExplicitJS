@@ -6,7 +6,7 @@
 import { ArgError, helpText, parseArgs } from "./cliArgs.ts";
 import { run } from "./main.ts";
 
-const VERSION = "1beta1";
+const VERSION = "1beta2";
 
 const encoder = new TextEncoder();
 function writeErr(message: string): void {

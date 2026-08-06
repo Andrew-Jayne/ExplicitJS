@@ -11,7 +11,7 @@ ExplicitJS runs with [Deno](https://deno.com/), straight from this repository â€
 **Install as a Deno shim** (pinned, recommended):
 
 ```bash
-deno install -g --allow-read --allow-env -n explicitjs https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta1/src/cli.ts
+deno install -g --allow-read --allow-env -n explicitjs https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta2/src/cli.ts
 explicitjs <path-to-scan>
 ```
 
@@ -19,7 +19,7 @@ explicitjs <path-to-scan>
 
 ```bash
 # Pinned to a release tag â€” immutable, auditable at a fixed commit:
-alias explicitjs="deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta1/src/cli.ts"
+alias explicitjs="deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta2/src/cli.ts"
 
 # Or track the latest on main (mutable):
 alias explicitjs="deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/main/src/cli.ts"

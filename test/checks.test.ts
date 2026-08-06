@@ -28,17 +28,14 @@ interface Case {
 const VALID = new Set<string>(CHECK_TYPES);
 
 function countByType(source: string, extra: CheckType[]): Counts {
-  const checks = analyzeSource(source, "case.ts", {
-    includeExtra: new Set(extra),
-  });
   const counts: Counts = {};
-  for (const check of checks) {
+  for (const check of analyzeSource(source, "case.ts", { includeExtra: new Set(extra) })) {
     counts[check.checkType] = (counts[check.checkType] ?? 0) + 1;
   }
   return counts;
 }
 
-const cases: Case[] = [
+const CASES: Case[] = [
   // --- if: truthiness in an if condition --------------------------------
   { name: "if: bare identifier", source: "if (items) {}", expect: { if: 1 } },
   { name: "if: negated identifier", source: "if (!value) {}", expect: { if: 1 } },
@@ -269,6 +266,50 @@ const cases: Case[] = [
     expect: {},
   },
 
+  // --- optional parameters (extra only) ---------------------------------
+  {
+    name: "optional_param: not flagged by default",
+    source: "export function fn(config?: Options): void {}",
+    expect: {},
+  },
+  {
+    name: "optional_param: flagged with extra",
+    source: "export function fn(config?: Options): void {}",
+    extra: ["optional_param" as CheckType],
+    expect: { optional_param: 1 },
+  },
+  {
+    name: "optional_param: explicit null default is clean",
+    source: "export function fn(config: Options | null = null): void {}",
+    extra: ["optional_param" as CheckType],
+    expect: {},
+  },
+  {
+    name: "optional_param: method parameter flagged",
+    source: "export class Api { fetch(query?: string): void {} }",
+    extra: ["optional_param" as CheckType],
+    expect: { optional_param: 1 },
+  },
+  {
+    name: "optional_param: arrow parameter flagged",
+    source: "export const handler = (event?: Event): number => 1;",
+    extra: ["optional_param" as CheckType],
+    expect: { optional_param: 1 },
+  },
+  {
+    name: "optional_param: interface signature is exempt",
+    source: "export interface Api { fetch(query?: string): void; }",
+    extra: ["optional_param" as CheckType],
+    expect: {},
+  },
+  {
+    name: "optional_param: overload declaration is exempt, implementation is not",
+    source:
+      "export function fn(query?: string): void; export function fn(query?: string): void { use(query); }",
+    extra: ["optional_param" as CheckType],
+    expect: { optional_param: 1 },
+  },
+
   // --- arrow / function expressions (default vs. extra) -----------------
   {
     name: "arrow: ternary body is ambiguous (default)",
@@ -331,7 +372,7 @@ const cases: Case[] = [
   },
 ];
 
-for (const testCase of cases) {
+for (const testCase of CASES) {
   for (const key of Object.keys(testCase.expect)) {
     if (VALID.has(key) === false) {
       throw new Error(`${testCase.name}: unknown check type in expect: '${key}'`);

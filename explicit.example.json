@@ -16,14 +16,17 @@
     "  loose_equality      - == / != (coerces operands; use === / !==)",
     "  single_letter_var   - one-character names: x, n, e",
     "  single_use_var      - a variable assigned once and read once",
-    "  single_use_func     - a function defined once and called once"
+    "  single_use_func     - a function defined once and called once",
+    "  optional_param      - arg?: T parameters (only runs when promoted via",
+    "                        include-extra below)"
   ],
   "include-extra": [],
   "//include-extra": [
-    "Opt into stricter variants of the 'exotic' checks. By default these only",
-    "flag an ambiguous (implicit-boolean) use; listing a check here flags",
-    "EVERY occurrence. Defaults to []. Valid values:",
-    "  arrow - flag all arrow / function expressions, not just ambiguous ones"
+    "Opt into stricter checks. Defaults to []. Valid values:",
+    "  arrow          - flag ALL arrow / function expressions, not just the",
+    "                   ambiguous (implicit-boolean) ones flagged by default",
+    "  optional_param - flag arg?: T in function implementations; prefer the",
+    "                   explicit arg: T | null = null"
   ],
   "no-color": false,
   "stats-only": false

@@ -50,10 +50,13 @@ function findUp(start: string, filename: string): string | undefined {
   }
 }
 
-export function loadConfig(start: string, configPath?: string): Config {
+export function loadConfig(
+  start: string,
+  configPath: string | null = null,
+): Config {
   const config = emptyConfig();
 
-  if (configPath !== undefined) {
+  if (configPath !== null) {
     applyRcFile(configPath, config);
     return config;
   }

@@ -145,7 +145,7 @@ export function run(args: Args): number {
     return 1;
   }
 
-  const config = loadConfig(args.path, args.config);
+  const config = loadConfig(args.path, args.config ?? null);
   const settings = resolveSettings(args, config);
 
   if (settings.noColor !== true && Deno.stdout.isTerminal() === true) {

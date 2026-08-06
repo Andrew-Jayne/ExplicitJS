@@ -4,6 +4,7 @@
   "exports": "./src/cli.ts",
   "tasks": {
     "start": "deno run --allow-read --allow-env src/cli.ts",
+    "lint": "deno run --allow-read --allow-env src/cli.ts .",
     "test": "deno test --allow-read --allow-env",
     "check": "deno check src/cli.ts test/checks.test.ts"
   },

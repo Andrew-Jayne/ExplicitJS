@@ -157,6 +157,9 @@ export class CodeVisitor {
           node as ts.ArrowFunction | ts.FunctionExpression,
         );
         break;
+      case ts.SyntaxKind.Parameter:
+        this.checkOptionalParam(node as ts.ParameterDeclaration);
+        break;
       default:
         break;
     }
@@ -170,7 +173,7 @@ export class CodeVisitor {
   private implicitBoolCheck(
     expr: ts.Expression,
     checkType: CheckType,
-    context?: string,
+    context: string | null = null,
   ): void {
     const subject = unwrapParens(expr);
 
@@ -194,7 +197,7 @@ export class CodeVisitor {
     }
 
     let message = context;
-    if (message === undefined) {
+    if (message === null) {
       const template = CONTEXT_TEMPLATES[checkType];
       if (template !== undefined) {
         message = template(truncate(subject.getText(this.sourceFile)));
@@ -399,6 +402,43 @@ export class CodeVisitor {
     }
   }
 
+  // --- optional parameters (include-extra) ----------------------------------
+
+  /**
+   * Flag `arg?: T` in a function implementation: whether `undefined` is
+   * meaningful or accidental is invisible at the call site. The explicit form
+   * `arg: T | null = null` names the absent value and documents the default.
+   * Type-space signatures (interfaces, function types, overload declarations)
+   * cannot carry defaults, so only implementations — parents with a body —
+   * are flagged.
+   */
+  private checkOptionalParam(node: ts.ParameterDeclaration): void {
+    if (this.includeExtra.has(CheckType.OPTIONAL_PARAM) === false) {
+      return;
+    }
+    if (node.questionToken === undefined) {
+      return;
+    }
+    const parent = node.parent;
+    if (ts.isFunctionLike(parent) === false) {
+      return;
+    }
+    if ((parent as ts.FunctionLikeDeclaration).body === undefined) {
+      return;
+    }
+
+    const name = node.name.getText(this.sourceFile);
+    let typeText = "T";
+    if (node.type !== undefined) {
+      typeText = truncate(node.type.getText(this.sourceFile));
+    }
+    this.addCheck(
+      node,
+      CheckType.OPTIONAL_PARAM,
+      `Optional parameter '${name}?' leaves absence implicit - use '${name}: ${typeText} | null = null' (optional_param in include-extra)`,
+    );
+  }
+
   // --- single-letter names --------------------------------------------------
 
   private checkSingleLetterFor(node: ts.Node): void {
@@ -493,7 +533,7 @@ export class CodeVisitor {
     node: ts.Node,
     checkType: CheckType,
     context: string,
-    code?: string,
+    code: string | null = null,
   ): void {
     const { line, column } = this.position(node);
     this.checks.push({

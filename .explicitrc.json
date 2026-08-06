@@ -1,0 +1,4 @@
+{
+  "//": "ExplicitJS's own dogfood config: `deno task lint` runs the tool on itself. optional_param is our standard; the arrow extra (ban ALL anonymous functions) stays off because TS visitor callbacks make named functions impractical.",
+  "include-extra": ["optional_param"]
+}

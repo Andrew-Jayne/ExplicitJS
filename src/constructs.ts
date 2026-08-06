@@ -35,6 +35,7 @@ export enum CheckType {
   SINGLE_LETTER_VAR = "single_letter_var",
   SINGLE_USE_VAR = "single_use_var",
   SINGLE_USE_FUNC = "single_use_func",
+  OPTIONAL_PARAM = "optional_param",
 }
 
 export const CHECK_TYPES: readonly CheckType[] = Object.values(CheckType);
@@ -44,11 +45,14 @@ export function isCheckType(value: string): value is CheckType {
 }
 
 /**
- * Checks that have a stricter, opt-in variant. By default each only flags an
- * ambiguous (implicit-boolean) use; listing it in `include-extra` upgrades it
- * to flag *every* occurrence (e.g. ban all arrow functions).
+ * Opt-in checks, enabled via `include-extra`. `arrow` by default only flags an
+ * ambiguous (implicit-boolean) use and is upgraded here to flag *every*
+ * occurrence; `optional_param` runs only when opted in.
  */
-export const EXTRA_CHECKS: ReadonlySet<CheckType> = new Set([CheckType.ARROW]);
+export const EXTRA_CHECKS: ReadonlySet<CheckType> = new Set([
+  CheckType.ARROW,
+  CheckType.OPTIONAL_PARAM,
+]);
 
 export interface StyleCheck {
   file: string;

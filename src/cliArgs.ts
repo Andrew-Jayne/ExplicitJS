@@ -157,6 +157,11 @@ export function parseArgs(argv: readonly string[]): Args {
     }
   }
 
+  if (positionals.length > 1) {
+    throw new ArgError(
+      `Unexpected extra argument '${positionals[1]}' - only one path is allowed`,
+    );
+  }
   if (positionals.length > 0) {
     args.path = positionals[0];
   }

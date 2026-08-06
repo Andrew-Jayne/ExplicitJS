@@ -50,6 +50,7 @@ Available tags are on the [Releases page](https://github.com/Andrew-Jayne/Explic
 | **Single-letter names**                                                    | `x`, `n`, `e` — no semantic meaning                                     | descriptive names                                                       |
 | **Single-use variables**                                                   | `const r = compute(); return r;` — pointless indirection                | inline the expression                                                   |
 | **Single-use functions**                                                   | a helper called exactly once                                            | inline at the call site                                                 |
+| **Optional parameters** (opt-in)                                           | `arg?: T` — is an absent value meaningful or an accident?               | `arg: T \| null = null` — names the absent value, documents the default |
 
 It parses JavaScript and TypeScript (including JSX/TSX) with the TypeScript compiler, so no build step or `tsconfig` is required to analyze a file.
 
@@ -68,6 +69,9 @@ explicitjs . --exclude-type ternary --exclude-type loose_equality
 
 # Strict mode: flag every arrow / function expression, not just ambiguous ones
 explicitjs . --include-extra arrow
+
+# Ban optional parameters (arg?: T) in favor of explicit defaults (arg: T | null = null)
+explicitjs . --include-extra optional_param
 
 # Redirect the report to a file with your shell
 explicitjs src/ > report.txt
@@ -96,7 +100,7 @@ ExplicitJS reads defaults from a `.explicitrc.json` file — discovered by walki
 Two lists drive what runs:
 
 - **`exclude-type`** turns a check off entirely.
-- **`include-extra`** opts into the stricter variant of an "exotic" check. By default `arrow` only flags _ambiguous_ (implicit-boolean) arrow bodies; listing it here flags **every** arrow / function expression. (If a check appears in both lists, `exclude-type` wins — it is filtered out after analysis.)
+- **`include-extra`** opts into stricter checks. `arrow` by default only flags _ambiguous_ (implicit-boolean) arrow bodies; listing it here flags **every** arrow / function expression. `optional_param` runs only when listed here: it flags `arg?: T` in function implementations, where `arg: T | null = null` states the default explicitly (type-space signatures such as interfaces and overload declarations are exempt — they cannot carry defaults). (If a check appears in both lists, `exclude-type` wins — it is filtered out after analysis.)
 
 See [explicit.example.json](explicit.example.json) for every setting and its default.
 
@@ -126,11 +130,14 @@ The goal is not style, it's semantic precision: code should say what it means so
 
 ```bash
 deno task start <path-to-scan>   # run the CLI against any source
+deno task lint                   # dogfood: run ExplicitJS on its own source
 deno task test                   # run the test suite
 deno task check                  # type-check
 ```
 
-Tests live in [test/checks.test.ts](test/checks.test.ts) as table-driven cases: each is a self-contained source snippet paired with the exact `{ checkType: count }` it should produce. To add coverage, add a case to the `cases` array.
+ExplicitJS lints itself with its own [.explicitrc.json](.explicitrc.json) (including the opt-in `optional_param` check); `deno task lint` must exit clean.
+
+Tests live in [test/checks.test.ts](test/checks.test.ts) as table-driven cases: each is a self-contained source snippet paired with the exact `{ checkType: count }` it should produce. To add coverage, add a case to the `CASES` array.
 
 ## Requirements
 

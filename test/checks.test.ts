@@ -218,6 +218,38 @@ const cases: Case[] = [
     expect: {},
   },
 
+  // --- single-use with closures (binding resolution) --------------------
+  {
+    name: "single_use_var: reads inside a closure count toward the binding",
+    source:
+      "export function demo(): Widget { const conn = openConn(); onEvent(function handle(): void { conn.send(1); conn.send(2); }); return new Widget(conn); }",
+    expect: {},
+  },
+  {
+    name: "single_use_var: read only inside a closure is exempt",
+    source:
+      "export function demo(): void { const conn = openConn(); onEvent(function handle(): void { conn.send(1); }); }",
+    expect: {},
+  },
+  {
+    name: "single_use_var: shadowed name inside closure still flags the outer binding",
+    source:
+      "export function demo(): number { const total = compute(); onEvent(function handle(total: number): number { return total + total; }); return total; }",
+    expect: { single_use_var: 1 },
+  },
+  {
+    name: "single_use_var: assignment from a closure counts as a second definition",
+    source:
+      "export function demo(): number { let total = 0; onEvent(function handle(): void { total = compute(); }); return total; }",
+    expect: {},
+  },
+  {
+    name: "single_use_func: call from a closure counts toward the definition",
+    source:
+      "export function caller(): void { function helper(): number { return 1; } onEvent(function handle(): number { return helper(); }); helper(); }",
+    expect: {},
+  },
+
   // --- single-use functions ---------------------------------------------
   {
     name: "single_use_func: nested helper called once",

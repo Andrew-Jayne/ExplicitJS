@@ -11,7 +11,7 @@ ExplicitJS runs with [Deno](https://deno.com/), straight from this repository �
 **Install as a Deno shim** (pinned, recommended):
 
 ```bash
-deno install -g --allow-read --allow-env -n explicitjs https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta2/src/cli.ts
+deno install -g --allow-read --allow-env -n explicitjs https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta3/src/cli.ts
 explicitjs <path-to-scan>
 ```
 
@@ -19,7 +19,7 @@ explicitjs <path-to-scan>
 
 ```bash
 # Pinned to a release tag — immutable, auditable at a fixed commit:
-alias explicitjs="deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta2/src/cli.ts"
+alias explicitjs="deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta3/src/cli.ts"
 
 # Or track the latest on main (mutable):
 alias explicitjs="deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/main/src/cli.ts"
@@ -29,18 +29,31 @@ explicitjs <path-to-scan>
 
 Available tags are on the [Releases page](https://github.com/Andrew-Jayne/ExplicitJS/releases). Deno caches the source after the first fetch, so a pinned URL only resolves once per version.
 
-**Prefer Bun or npm?** ExplicitJS isn't published to any package registry — but every [GitHub Release](https://github.com/Andrew-Jayne/ExplicitJS/releases) has a prebuilt, npm-installable tarball attached (compiled to plain JS, no Deno-only APIs). Install it straight from the release asset URL, no cloning required:
+**Prefer Bun or npm?** ExplicitJS isn't published to any package registry — but every [GitHub Release](https://github.com/Andrew-Jayne/ExplicitJS/releases) has a prebuilt, npm-installable tarball attached.
 
 ```bash
-# npm (global install — node is always present for npm users, so the bin just works):
-npm install -g https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta2/explicitjs-1beta2.tgz
-explicitjs <path-to-scan>
-
-# Bun (project-local install; `bun add -g` + running the bin straight off PATH
-# needs a real `node` on PATH too, since the bin's shebang is `#!/usr/bin/env node` —
-# `bunx`/`bun x` sidesteps that by running the file through Bun itself):
-bun add https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta2/explicitjs-1beta2.tgz
+# Bun — add as a dev dependency
+bun add -d https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta3/explicitjs-1beta3.tgz
 bunx explicitjs <path-to-scan>
+
+# npm — global install
+npm install -g https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta3/explicitjs-1beta3.tgz
+explicitjs <path-to-scan>
+```
+
+Adding it as a dev dependency means every developer on the project gets the same version, and you can wire it into a `package.json` script or CI step:
+
+```jsonc
+// package.json
+{
+  "scripts": {
+    "lint:explicit": "explicitjs src/"
+  }
+}
+```
+
+```bash
+bun run lint:explicit
 ```
 
 Check the [Releases page](https://github.com/Andrew-Jayne/ExplicitJS/releases) for the exact tarball filename per version — it's `explicitjs-<version>.tgz`, matching the `version` in that release's `package.json`.

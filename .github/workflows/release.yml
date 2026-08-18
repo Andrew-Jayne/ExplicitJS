@@ -31,13 +31,11 @@ jobs:
         run: deno task fmt:check
       - name: Dogfood lint
         run: deno task lint
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Install npm dependencies
-        run: npm install
-      - name: Build npm-installable tarball
-        run: npm pack
+      - uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        run: bun install
+      - name: Build & pack tarball
+        run: bun run build && npm pack --ignore-scripts
       - name: Create GitHub Release
         run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes ./*.tgz
         env:

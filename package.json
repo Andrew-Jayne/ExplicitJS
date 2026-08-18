@@ -18,7 +18,7 @@
     "fmt:check": "biome ci .",
     "check": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json && sed -i.bak '1s|.*|#!/usr/bin/env node|' dist/cli.js && rm -f dist/cli.js.bak && chmod +x dist/cli.js",
-    "prepack": "npm run build"
+    "prepack": "bun run build"
   },
   "dependencies": {
     "typescript": "^6.0.3"

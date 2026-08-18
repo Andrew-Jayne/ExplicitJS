@@ -7,18 +7,18 @@
 
 import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
-import { type Args } from "./cliArgs.ts";
+import process from "node:process";
+import type { Args } from "./cliArgs.ts";
 import { type Config, loadConfig } from "./config.ts";
 import { Colors, ReportFormat, type StyleCheck } from "./constructs.ts";
 import { analyzeFile } from "./fileHandlers.ts";
 import { formatReport, generateStatisticsReport } from "./reporters.ts";
 
-const encoder = new TextEncoder();
 function writeErr(message: string): void {
-  Deno.stderr.writeSync(encoder.encode(message));
+  process.stderr.write(message);
 }
 function writeOut(message: string): void {
-  Deno.stdout.writeSync(encoder.encode(message));
+  process.stdout.write(message);
 }
 
 const SOURCE_EXTENSIONS: ReadonlySet<string> = new Set([
@@ -57,10 +57,7 @@ interface Settings {
   includeExtra: Set<string>;
 }
 
-function resolveBool(
-  cli: boolean | undefined,
-  config: boolean | undefined,
-): boolean {
+function resolveBool(cli: boolean | undefined, config: boolean | undefined): boolean {
   if (cli !== undefined) {
     return cli;
   }
@@ -70,10 +67,7 @@ function resolveBool(
   return false;
 }
 
-function mergeList(
-  cli: string[] | undefined,
-  config: string[] | undefined,
-): string[] {
+function mergeList(cli: string[] | undefined, config: string[] | undefined): string[] {
   const merged: string[] = [];
   if (config !== undefined) {
     merged.push(...config);
@@ -133,10 +127,7 @@ function collectFiles(target: string): string[] {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory() === true) {
-        if (
-          SKIP_DIRS.has(entry.name) === false &&
-          entry.name.startsWith(".") === false
-        ) {
+        if (SKIP_DIRS.has(entry.name) === false && entry.name.startsWith(".") === false) {
           pending.push(full);
         }
       } else if (entry.isFile() === true && isSupportedFile(full) === true) {
@@ -165,7 +156,7 @@ export function run(args: Args): number {
   const config = loadConfig(args.path, configPath);
   const settings = resolveSettings(args, config);
 
-  if (settings.noColor !== true && Deno.stdout.isTerminal() === true) {
+  if (settings.noColor !== true && process.stdout.isTTY === true) {
     Colors.enable();
   }
 
@@ -187,9 +178,7 @@ export function run(args: Args): number {
 
   if (settings.excludeType.length > 0) {
     const excluded = new Set(settings.excludeType);
-    allChecks = allChecks.filter(
-      (check) => excluded.has(check.checkType) === false,
-    );
+    allChecks = allChecks.filter((check) => excluded.has(check.checkType) === false);
   }
 
   let report: string;
@@ -199,7 +188,7 @@ export function run(args: Args): number {
     report = formatReport(allChecks, settings.outputFormat);
   }
 
-  writeOut(report + "\n");
+  writeOut(`${report}\n`);
 
   if (allChecks.length > 0) {
     return 1;

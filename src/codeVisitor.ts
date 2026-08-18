@@ -8,7 +8,7 @@
  * Scope-level checks (single-use var/func) live in `singleUse.ts`.
  */
 
-import ts from "npm:typescript@^6.0.3";
+import ts from "typescript";
 import { CheckType, type StyleCheck } from "./constructs.ts";
 
 const MAX_CODE_LENGTH = 100;
@@ -41,7 +41,7 @@ const CONTEXT_TEMPLATES: Partial<Record<CheckType, (code: string) => string>> = 
 function truncate(code: string): string {
   const collapsed = code.replace(/\s+/g, " ");
   if (collapsed.length > MAX_CODE_LENGTH) {
-    return collapsed.slice(0, MAX_CODE_LENGTH) + "...";
+    return `${collapsed.slice(0, MAX_CODE_LENGTH)}...`;
   }
   return collapsed;
 }
@@ -63,22 +63,17 @@ function isComparison(expr: ts.Expression): boolean {
 
 function isLogical(expr: ts.Expression): expr is ts.BinaryExpression {
   return (
-    ts.isBinaryExpression(expr) === true &&
-    LOGICAL_TOKENS.has(expr.operatorToken.kind) === true
+    ts.isBinaryExpression(expr) === true && LOGICAL_TOKENS.has(expr.operatorToken.kind) === true
   );
 }
 
 function isBooleanLiteral(expr: ts.Expression): boolean {
-  return (
-    expr.kind === ts.SyntaxKind.TrueKeyword ||
-    expr.kind === ts.SyntaxKind.FalseKeyword
-  );
+  return expr.kind === ts.SyntaxKind.TrueKeyword || expr.kind === ts.SyntaxKind.FalseKeyword;
 }
 
 function isNotOperator(expr: ts.Expression): expr is ts.PrefixUnaryExpression {
   return (
-    ts.isPrefixUnaryExpression(expr) === true &&
-    expr.operator === ts.SyntaxKind.ExclamationToken
+    ts.isPrefixUnaryExpression(expr) === true && expr.operator === ts.SyntaxKind.ExclamationToken
   );
 }
 
@@ -116,22 +111,13 @@ export class CodeVisitor {
   private visit(node: ts.Node): void {
     switch (node.kind) {
       case ts.SyntaxKind.IfStatement:
-        this.implicitBoolCheck(
-          (node as ts.IfStatement).expression,
-          CheckType.IF,
-        );
+        this.implicitBoolCheck((node as ts.IfStatement).expression, CheckType.IF);
         break;
       case ts.SyntaxKind.WhileStatement:
-        this.implicitBoolCheck(
-          (node as ts.WhileStatement).expression,
-          CheckType.WHILE,
-        );
+        this.implicitBoolCheck((node as ts.WhileStatement).expression, CheckType.WHILE);
         break;
       case ts.SyntaxKind.DoStatement:
-        this.implicitBoolCheck(
-          (node as ts.DoStatement).expression,
-          CheckType.WHILE,
-        );
+        this.implicitBoolCheck((node as ts.DoStatement).expression, CheckType.WHILE);
         break;
       case ts.SyntaxKind.ConditionalExpression:
         this.addCheck(
@@ -153,9 +139,7 @@ export class CodeVisitor {
         break;
       case ts.SyntaxKind.ArrowFunction:
       case ts.SyntaxKind.FunctionExpression:
-        this.visitFunctionLike(
-          node as ts.ArrowFunction | ts.FunctionExpression,
-        );
+        this.visitFunctionLike(node as ts.ArrowFunction | ts.FunctionExpression);
         break;
       case ts.SyntaxKind.Parameter:
         this.checkOptionalParam(node as ts.ParameterDeclaration);
@@ -213,10 +197,7 @@ export class CodeVisitor {
   private visitBinary(node: ts.BinaryExpression): void {
     const op = node.operatorToken.kind;
 
-    if (
-      op === ts.SyntaxKind.EqualsEqualsToken ||
-      op === ts.SyntaxKind.ExclamationEqualsToken
-    ) {
+    if (op === ts.SyntaxKind.EqualsEqualsToken || op === ts.SyntaxKind.ExclamationEqualsToken) {
       let symbol: string;
       let strict: string;
       if (op === ts.SyntaxKind.EqualsEqualsToken) {
@@ -303,17 +284,10 @@ export class CodeVisitor {
     }
   }
 
-  private collectChain(
-    node: ts.BinaryExpression,
-    op: ts.SyntaxKind,
-    out: ts.Expression[],
-  ): void {
+  private collectChain(node: ts.BinaryExpression, op: ts.SyntaxKind, out: ts.Expression[]): void {
     for (const side of [node.left, node.right]) {
       const inner = unwrapParens(side);
-      if (
-        ts.isBinaryExpression(inner) === true &&
-        inner.operatorToken.kind === op
-      ) {
+      if (ts.isBinaryExpression(inner) === true && inner.operatorToken.kind === op) {
         this.collectChain(inner, op, out);
       } else {
         out.push(side);
@@ -326,9 +300,7 @@ export class CodeVisitor {
   private visitCall(node: ts.CallExpression): void {
     const calleeText = node.expression.getText(this.sourceFile);
     if (
-      (calleeText === "assert" ||
-        calleeText === "console.assert" ||
-        calleeText === "assert.ok") &&
+      (calleeText === "assert" || calleeText === "console.assert" || calleeText === "assert.ok") &&
       node.arguments.length >= 1
     ) {
       this.implicitBoolCheck(node.arguments[0]!, CheckType.ASSERT);
@@ -399,9 +371,7 @@ export class CodeVisitor {
 
   // --- arrow / function expressions -----------------------------------------
 
-  private visitFunctionLike(
-    node: ts.ArrowFunction | ts.FunctionExpression,
-  ): void {
+  private visitFunctionLike(node: ts.ArrowFunction | ts.FunctionExpression): void {
     if (this.includeExtra.has(CheckType.ARROW) === true) {
       let code: string;
       if (node.kind === ts.SyntaxKind.ArrowFunction) {
@@ -515,10 +485,7 @@ export class CodeVisitor {
       case ts.SyntaxKind.CatchClause: {
         const decl = (node as ts.CatchClause).variableDeclaration;
         if (decl !== undefined) {
-          this.flagIfSingleLetter(
-            decl.name,
-            "use a descriptive exception variable (not 'e')",
-          );
+          this.flagIfSingleLetter(decl.name, "use a descriptive exception variable (not 'e')");
         }
         break;
       }
@@ -542,10 +509,7 @@ export class CodeVisitor {
     }
   }
 
-  private flagSingleLetterIdentifier(
-    name: ts.Identifier,
-    context: string,
-  ): void {
+  private flagSingleLetterIdentifier(name: ts.Identifier, context: string): void {
     const text = name.text;
     if (text.length === 1 && text !== "_") {
       const { line, column } = this.position(name);

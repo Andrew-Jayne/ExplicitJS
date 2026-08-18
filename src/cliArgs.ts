@@ -6,12 +6,12 @@
 
 import {
   CHECK_TYPES,
-  CheckType,
+  type CheckType,
   EXTRA_CHECKS,
   isCheckType,
   isReportFormat,
   REPORT_FORMATS,
-  ReportFormat,
+  type ReportFormat,
 } from "./constructs.ts";
 
 export interface Args {
@@ -81,7 +81,7 @@ export function parseArgs(argv: readonly string[]): Args {
     index += 1;
 
     // Support `--flag=value` form.
-    let inlineValue: string | undefined = undefined;
+    let inlineValue: string | undefined;
     let flag = token;
     if (token.startsWith("--") === true && token.includes("=") === true) {
       const eq = token.indexOf("=");
@@ -131,10 +131,7 @@ export function parseArgs(argv: readonly string[]): Args {
       }
       case "--include-extra": {
         const value = next();
-        if (
-          isCheckType(value) === false ||
-          EXTRA_CHECKS.has(value as CheckType) === false
-        ) {
+        if (isCheckType(value) === false || EXTRA_CHECKS.has(value as CheckType) === false) {
           throw new ArgError(
             `Invalid extra check '${value}'. Choose one of: ${[...EXTRA_CHECKS].join(", ")}`,
           );
@@ -164,9 +161,7 @@ export function parseArgs(argv: readonly string[]): Args {
   }
 
   if (positionals.length > 1) {
-    throw new ArgError(
-      `Unexpected extra argument '${positionals[1]}' - only one path is allowed`,
-    );
+    throw new ArgError(`Unexpected extra argument '${positionals[1]}' - only one path is allowed`);
   }
   if (positionals.length > 0) {
     args.path = positionals[0];

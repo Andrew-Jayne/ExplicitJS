@@ -29,6 +29,39 @@ explicitjs <path-to-scan>
 
 Available tags are on the [Releases page](https://github.com/Andrew-Jayne/ExplicitJS/releases). Deno caches the source after the first fetch, so a pinned URL only resolves once per version.
 
+**Prefer Bun or npm?** ExplicitJS isn't published to any package registry — but every [GitHub Release](https://github.com/Andrew-Jayne/ExplicitJS/releases) has a prebuilt, npm-installable tarball attached (compiled to plain JS, no Deno-only APIs). Install it straight from the release asset URL, no cloning required:
+
+```bash
+# npm (global install — node is always present for npm users, so the bin just works):
+npm install -g https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta2/explicitjs-1beta2.tgz
+explicitjs <path-to-scan>
+
+# Bun (project-local install; `bun add -g` + running the bin straight off PATH
+# needs a real `node` on PATH too, since the bin's shebang is `#!/usr/bin/env node` —
+# `bunx`/`bun x` sidesteps that by running the file through Bun itself):
+bun add https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta2/explicitjs-1beta2.tgz
+bunx explicitjs <path-to-scan>
+```
+
+Check the [Releases page](https://github.com/Andrew-Jayne/ExplicitJS/releases) for the exact tarball filename per version — it's `explicitjs-<version>.tgz`, matching the `version` in that release's `package.json`.
+
+Contributing or building from source instead? Clone the repo and use the source tree directly:
+
+```bash
+git clone https://github.com/Andrew-Jayne/ExplicitJS.git && cd ExplicitJS
+
+# Bun runs the TypeScript source directly, no extra tooling needed:
+bun install
+bun src/cli.ts <path-to-scan>
+
+# npm needs a TS runner (tsx) since plain Node can't execute this source yet
+# — package.json wires that up for you:
+npm install
+npm start -- <path-to-scan>
+```
+
+Don't mix the two inside one invocation: `bun run start` (as opposed to `bun src/cli.ts`) will fail — the `start` script shells out to `tsx`, which isn't Bun-compatible. Bun doesn't need `tsx` at all, so just run the file directly.
+
 
 
 `<path-to-scan>` is whatever file or directory you want analyzed — `src/`, `app.ts`, `.`, etc.
@@ -129,17 +162,29 @@ The goal is not style, it's semantic precision: code should say what it means so
 
 ## Development
 
-```bash
-deno task start <path-to-scan>   # run the CLI against any source
-deno task lint                   # dogfood: run ExplicitJS on its own source
-deno task test                   # run the test suite
-deno task check                  # type-check
-```
+| Task                        | Deno                | Bun                    | npm                 |
+| ---------------------------- | -------------------- | ----------------------- | --------------------- |
+| Run the CLI against any source | `deno task start <path>` | `bun src/cli.ts <path>` | `npm start -- <path>` |
+| Dogfood: lint ExplicitJS's own source | `deno task lint` | `bun src/cli.ts .` | `npm run lint` |
+| Run the test suite | `deno task test` | — (Deno-only, see below) | — |
+| Type-check | `deno task check` | `bun run check` | `npm run check` |
+| Format + lint with Biome, autofixing | `deno task fmt` | `bun run fmt` | `npm run fmt` |
+| Format + lint, CI mode (no writes) | `deno task fmt:check` | `bun run fmt:check` | `npm run fmt:check` |
 
-ExplicitJS lints itself with its own [.explicitrc.json](.explicitrc.json) (including the opt-in `optional_param` check); `deno task lint` must exit clean.
+Bun and npm need a one-time `bun install` / `npm install` first, to pull down `typescript`, `tsx` (npm only — Bun runs the TypeScript source natively), and Biome.
 
-Tests live in [test/checks.test.ts](test/checks.test.ts) as table-driven cases: each is a self-contained source snippet paired with the exact `{ checkType: count }` it should produce. To add coverage, add a case to the `CASES` array.
+`npm run build` compiles `src/` to plain JS in `dist/` (rewriting `.ts` imports to `.js`, and the shebang to `#!/usr/bin/env node`); `npm pack` runs that automatically (via `prepack`) and produces the tarball attached to each [Release](https://github.com/Andrew-Jayne/ExplicitJS/releases) — `dist/` itself is gitignored, generated only for that.
+
+ExplicitJS lints itself with its own [.explicitrc.json](.explicitrc.json) (including the opt-in `optional_param` check); the `lint` task must exit clean. Code style is enforced by [Biome](https://biomejs.dev/) via [biome.json](biome.json); `fmt:check` must exit clean.
+
+Tests live in [test/checks.test.ts](test/checks.test.ts) as table-driven cases: each is a self-contained source snippet paired with the exact `{ checkType: count }` it should produce. To add coverage, add a case to the `CASES` array. The suite uses Deno's built-in test runner and `jsr:@std/assert`, so `deno task test` is currently the only way to run it, even if you're developing with Bun or npm.
 
 ## Requirements
 
-[Deno](https://deno.com/) >= 2.8 installed. Building from source needs the same.
+Any one of:
+
+- [Deno](https://deno.com/) >= 2.8
+- [Bun](https://bun.sh/) >= 1.0
+- Node.js + npm (any version recent enough to run [tsx](https://tsx.is/))
+
+Building from source needs the same.

@@ -1,28 +1,21 @@
 {
   "name": "explicitjs",
-  "version": "1beta2",
+  "version": "1beta3",
   "exports": "./src/cli.ts",
+  "imports": {
+    "typescript": "npm:typescript@^6.0.3"
+  },
   "tasks": {
     "start": "deno run --allow-read --allow-env src/cli.ts",
     "lint": "deno run --allow-read --allow-env src/cli.ts .",
     "test": "deno test --allow-read --allow-env",
-    "check": "deno check src/cli.ts test/checks.test.ts"
+    "check": "deno check src/cli.ts test/checks.test.ts",
+    "fmt": "deno run -A npm:@biomejs/biome check --write .",
+    "fmt:check": "deno run -A npm:@biomejs/biome ci ."
   },
   "compilerOptions": {
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true
-  },
-  "fmt": {
-    "lineWidth": 100,
-    "indentWidth": 2,
-    "semiColons": true,
-    "singleQuote": false,
-    "exclude": ["*.md"]
-  },
-  "lint": {
-    "rules": {
-      "tags": ["recommended"]
-    }
   }
 }

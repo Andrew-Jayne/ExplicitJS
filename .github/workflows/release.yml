@@ -1,6 +1,9 @@
 # Publishes a GitHub Release whenever a v* tag is pushed, but only after the
-# tagged commit passes the full gate: type check, tests, and the dogfood lint
-# (ExplicitJS run on its own source). Nothing ships that fails its own rules.
+# tagged commit passes the full gate: type check, tests, Biome, and the
+# dogfood lint (ExplicitJS run on its own source). Nothing ships that fails
+# its own rules. The release also gets an npm-installable tarball attached
+# (compiled dist/, no Deno-only APIs) so Bun/npm users don't need to clone
+# the repo to use it — see README's "Prefer Bun or npm?" section.
 name: Release
 
 on:
@@ -22,9 +25,18 @@ jobs:
         run: deno task check
       - name: Test
         run: deno task test
+      - name: Format & lint
+        run: deno task fmt:check
       - name: Dogfood lint
         run: deno task lint
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install npm dependencies
+        run: npm install
+      - name: Build npm-installable tarball
+        run: npm pack
       - name: Create GitHub Release
-        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes ./*.tgz
         env:
           GH_TOKEN: ${{ github.token }}

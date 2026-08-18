@@ -3,41 +3,41 @@
  * Executable entry point for ExplicitJS.
  */
 
-import { ArgError, helpText, parseArgs } from "./cliArgs.ts";
+import process from "node:process";
+import { ArgError, type Args, helpText, parseArgs } from "./cliArgs.ts";
 import { run } from "./main.ts";
 
-const VERSION = "1beta2";
+const VERSION = "1beta3";
 
-const encoder = new TextEncoder();
 function writeErr(message: string): void {
-  Deno.stderr.writeSync(encoder.encode(message));
+  process.stderr.write(message);
 }
 function writeOut(message: string): void {
-  Deno.stdout.writeSync(encoder.encode(message));
+  process.stdout.write(message);
 }
 
 function main(): void {
-  let args;
+  let args: Args;
   try {
-    args = parseArgs(Deno.args);
+    args = parseArgs(process.argv.slice(2));
   } catch (error) {
     if (error instanceof ArgError) {
       writeErr(`error: ${error.message}\n`);
-      Deno.exit(2);
+      process.exit(2);
     }
     throw error;
   }
 
   if (args.showHelp === true) {
-    writeOut(helpText() + "\n");
-    Deno.exit(0);
+    writeOut(`${helpText()}\n`);
+    process.exit(0);
   }
   if (args.showVersion === true) {
     writeOut(`ExplicitJS ${VERSION}\n`);
-    Deno.exit(0);
+    process.exit(0);
   }
 
-  Deno.exit(run(args));
+  process.exit(run(args));
 }
 
 main();

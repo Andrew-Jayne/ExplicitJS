@@ -40,10 +40,7 @@ function sortByFileLine(left: StyleCheck, right: StyleCheck): number {
   return left.line - right.line;
 }
 
-function byCountDescending(
-  left: [string, number],
-  right: [string, number],
-): number {
+function byCountDescending(left: [string, number], right: [string, number]): number {
   return right[1] - left[1];
 }
 
@@ -106,7 +103,7 @@ function formatCsv(checks: StyleCheck[]): string {
       ].join(","),
     );
   }
-  return rows.join("\n") + "\n";
+  return `${rows.join("\n")}\n`;
 }
 
 function formatText(checks: StyleCheck[]): string {
@@ -117,21 +114,17 @@ function formatText(checks: StyleCheck[]): string {
   const output: string[] = [];
   output.push(
     "\n" +
-      Colors.paint(
-        Colors.BOLD + Colors.RED,
-        `Found ${checks.length} style violation(s):`,
-      ) +
+      Colors.paint(Colors.BOLD + Colors.RED, `Found ${checks.length} style violation(s):`) +
       "\n",
   );
   output.push(Colors.paint(Colors.GRAY, "─".repeat(80)));
 
+  // biome-ignore lint/complexity/noUselessUndefinedInitialization: without the initializer, ExplicitJS's own single-use-var check miscounts this binding's usages.
   let currentFile: string | undefined = undefined;
   for (const check of [...checks].sort(sortByFileLine)) {
     if (check.file !== currentFile) {
       currentFile = check.file;
-      output.push(
-        "\n" + Colors.paint(Colors.BOLD + Colors.BLUE, `📄 ${check.file}`),
-      );
+      output.push(`\n${Colors.paint(Colors.BOLD + Colors.BLUE, `📄 ${check.file}`)}`);
     }
     output.push(
       "  " +
@@ -143,19 +136,14 @@ function formatText(checks: StyleCheck[]): string {
         Colors.paint(typeColor(check.checkType), `[${check.checkType}]`),
     );
     output.push(
-      "    " +
-        Colors.paint(Colors.DIM, "Code:") +
-        " " +
-        Colors.paint(Colors.WHITE, check.code),
+      `    ${Colors.paint(Colors.DIM, "Code:")} ${Colors.paint(Colors.WHITE, check.code)}`,
     );
-    output.push(
-      "    " + Colors.paint(Colors.DIM, "Context:") + " " + check.context,
-    );
+    output.push(`    ${Colors.paint(Colors.DIM, "Context:")} ${check.context}`);
     output.push("");
   }
 
   output.push(Colors.paint(Colors.GRAY, "─".repeat(80)));
-  output.push("\n" + Colors.paint(Colors.BOLD + Colors.CYAN, "📊 Statistics:"));
+  output.push(`\n${Colors.paint(Colors.BOLD + Colors.CYAN, "📊 Statistics:")}`);
   const counts = countByType(checks);
   for (const checkType of [...counts.keys()].sort()) {
     output.push(
@@ -169,14 +157,9 @@ function formatText(checks: StyleCheck[]): string {
   return output.join("\n");
 }
 
-export function generateStatisticsReport(
-  checks: StyleCheck[],
-  fileCount: number,
-): string {
+export function generateStatisticsReport(checks: StyleCheck[], fileCount: number): string {
   const output: string[] = [];
-  output.push(
-    "\n" + Colors.paint(Colors.BOLD + Colors.CYAN, "📊 Check Statistics"),
-  );
+  output.push(`\n${Colors.paint(Colors.BOLD + Colors.CYAN, "📊 Check Statistics")}`);
   output.push(Colors.paint(Colors.GRAY, "═".repeat(50)));
   output.push(
     Colors.paint(Colors.BOLD, "Total files analyzed:") +
@@ -203,11 +186,7 @@ export function generateStatisticsReport(
 
   if (checks.length > 0) {
     output.push(Colors.paint(Colors.BOLD, "By type:"));
-    for (
-      const [checkType, count] of [...countByType(checks).entries()].sort(
-        byCountDescending,
-      )
-    ) {
+    for (const [checkType, count] of [...countByType(checks).entries()].sort(byCountDescending)) {
       const percentage = (count / checks.length) * 100;
       output.push(
         "  " +
@@ -217,10 +196,7 @@ export function generateStatisticsReport(
           " " +
           Colors.paint(Colors.GRAY, `(${percentage.toFixed(1).padStart(5)}%)`) +
           " " +
-          Colors.paint(
-            typeColor(checkType),
-            "█".repeat(Math.floor(percentage / 2)),
-          ),
+          Colors.paint(typeColor(checkType), "█".repeat(Math.floor(percentage / 2))),
       );
     }
   }

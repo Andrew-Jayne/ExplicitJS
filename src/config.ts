@@ -5,11 +5,11 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import {
-  CheckType,
+  type CheckType,
   EXTRA_CHECKS,
   isCheckType,
   isReportFormat,
-  ReportFormat,
+  type ReportFormat,
 } from "./constructs.ts";
 
 export interface Config {
@@ -36,10 +36,7 @@ function findUp(start: string, filename: string): string | undefined {
   let current = directoryOf(start);
   for (;;) {
     const candidate = path.join(current, filename);
-    if (
-      existsSync(candidate) === true &&
-      statSync(candidate).isFile() === true
-    ) {
+    if (existsSync(candidate) === true && statSync(candidate).isFile() === true) {
       return candidate;
     }
     const parent = path.dirname(current);
@@ -50,10 +47,7 @@ function findUp(start: string, filename: string): string | undefined {
   }
 }
 
-export function loadConfig(
-  start: string,
-  configPath: string | null = null,
-): Config {
+export function loadConfig(start: string, configPath: string | null = null): Config {
   const config = emptyConfig();
 
   if (configPath !== null) {
@@ -90,9 +84,7 @@ function applyRcFile(filepath: string, config: Config): void {
 }
 
 function isEnabledExtra(value: string): boolean {
-  return (
-    isCheckType(value) === true && EXTRA_CHECKS.has(value as CheckType) === true
-  );
+  return isCheckType(value) === true && EXTRA_CHECKS.has(value as CheckType) === true;
 }
 
 function applyTable(table: Record<string, unknown>, config: Config): void {
@@ -131,10 +123,7 @@ function lookup(table: Record<string, unknown>, ...keys: string[]): unknown {
   return undefined;
 }
 
-function lookupString(
-  table: Record<string, unknown>,
-  ...keys: string[]
-): string | undefined {
+function lookupString(table: Record<string, unknown>, ...keys: string[]): string | undefined {
   const value = lookup(table, ...keys);
   if (typeof value === "string") {
     return value;
@@ -142,10 +131,7 @@ function lookupString(
   return undefined;
 }
 
-function lookupBool(
-  table: Record<string, unknown>,
-  ...keys: string[]
-): boolean | undefined {
+function lookupBool(table: Record<string, unknown>, ...keys: string[]): boolean | undefined {
   const value = lookup(table, ...keys);
   if (typeof value === "boolean") {
     return value;
@@ -153,10 +139,7 @@ function lookupBool(
   return undefined;
 }
 
-function lookupArray(
-  table: Record<string, unknown>,
-  ...keys: string[]
-): string[] | undefined {
+function lookupArray(table: Record<string, unknown>, ...keys: string[]): string[] | undefined {
   const value = lookup(table, ...keys);
   if (Array.isArray(value) === true) {
     return value.filter((item): item is string => typeof item === "string");

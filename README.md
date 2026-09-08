@@ -6,7 +6,7 @@ ExplicitJS flags code where the author's intent is ambiguous — patterns that f
 
 **Deno:** run straight from this repo, no build step, no registry
 ```bash
-deno install -g --allow-read --allow-env -n explicitjs https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta4/src/cli.ts
+deno install -g --allow-read --allow-env --import-map https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta4/deno.json -n explicitjs https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta4/src/cli.ts
 ```
 
 **Bun/NPM:** prebuilt tarball attached to every GitHub Release

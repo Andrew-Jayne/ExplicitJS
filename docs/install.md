@@ -2,14 +2,14 @@
 
 ExplicitJS is not published to any package registry. Deno runs it straight from this repository; Bun and npm install a prebuilt tarball from the [Releases page](https://github.com/Andrew-Jayne/ExplicitJS/releases). Pick whichever runtime you already have.
 
-Every route needs `--allow-read` and `--allow-env` under Deno. The second flag exists because the `typescript` package reads `TSC_*` watch-mode variables at init — never used here, but Deno blocks the read without it.
+Every Deno route needs three flags. `--import-map` points at this repo's `deno.json`, which maps the bare `typescript` import onto `npm:typescript`; Deno doesn't fetch it on its own when running from a URL, so without the flag it fails with `Import "typescript" not a dependency`. `--allow-read` is for the files you scan. `--allow-env` exists because the `typescript` package reads `TSC_*` watch-mode variables at init — never used here, but Deno blocks the read without it.
 
 ## Deno
 
 **Install as a shim** (pinned, recommended). Deno fetches the import graph from the URL and caches it, so a pinned URL resolves only once per version:
 
 ```bash
-deno install -g --allow-read --allow-env -n explicitjs https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta4/src/cli.ts
+deno install -g --allow-read --allow-env --import-map https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta4/deno.json -n explicitjs https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta4/src/cli.ts
 explicitjs <path>
 ```
 
@@ -17,10 +17,10 @@ explicitjs <path>
 
 ```bash
 # Pinned to a release tag — immutable, auditable at a fixed commit:
-alias explicitjs="deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta4/src/cli.ts"
+alias explicitjs="deno run --allow-read --allow-env --import-map https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta4/deno.json https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta4/src/cli.ts"
 
 # Or track the latest on main (mutable):
-alias explicitjs="deno run --allow-read --allow-env https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/main/src/cli.ts"
+alias explicitjs="deno run --allow-read --allow-env --import-map https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/main/deno.json https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/main/src/cli.ts"
 ```
 
 Available tags are on the [Releases page](https://github.com/Andrew-Jayne/ExplicitJS/releases).

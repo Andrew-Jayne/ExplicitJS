@@ -5,9 +5,9 @@
 
 import process from "node:process";
 import { ArgError, type Args, helpText, parseArgs } from "./cliArgs.ts";
-import { run } from "./main.ts";
+import { EXIT_ARGS_ERROR, run } from "./main.ts";
 
-const VERSION = "1beta3";
+const VERSION = "1beta4";
 
 function writeErr(message: string): void {
   process.stderr.write(message);
@@ -23,7 +23,7 @@ function main(): void {
   } catch (error) {
     if (error instanceof ArgError) {
       writeErr(`error: ${error.message}\n`);
-      process.exit(2);
+      process.exit(EXIT_ARGS_ERROR);
     }
     throw error;
   }

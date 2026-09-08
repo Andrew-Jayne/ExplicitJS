@@ -32,9 +32,12 @@ const LOGICAL_TOKENS: ReadonlySet<ts.SyntaxKind> = new Set([
 ]);
 
 const CONTEXT_TEMPLATES: Partial<Record<CheckType, (code: string) => string>> = {
-  [CheckType.IF]: (code) => `if (${code})`,
-  [CheckType.WHILE]: (code) => `while (${code})`,
-  [CheckType.ASSERT]: (code) => `assert(${code})`,
+  [CheckType.IF]: (code) =>
+    `Implicit boolean: 'if (${code})' coerces the condition to a truth value - compare explicitly (=== null, .length > 0, ...)`,
+  [CheckType.WHILE]: (code) =>
+    `Implicit boolean: 'while (${code})' coerces the condition to a truth value - compare explicitly (=== null, .length > 0, ...)`,
+  [CheckType.ASSERT]: (code) =>
+    `Implicit boolean: 'assert(${code})' coerces the condition to a truth value - assert an explicit comparison`,
   [CheckType.ARROW]: (code) => `() => ${code}`,
 };
 
@@ -90,17 +93,36 @@ function isAccessExpression(node: ts.Node): node is AccessExpression {
   );
 }
 
+/** Line number -> extra-check names allowed by an `explicit: allow-*` directive there. */
+export type SuppressedLines = ReadonlyMap<number, ReadonlySet<string>>;
+
 export class CodeVisitor {
   private readonly checks: StyleCheck[] = [];
   private readonly seenNames = new Set<string>();
   private readonly includeExtra: ReadonlySet<string>;
+  private readonly suppressed: SuppressedLines;
 
   constructor(
     private readonly filename: string,
     private readonly sourceFile: ts.SourceFile,
     includeExtra: ReadonlySet<string> = new Set(),
+    suppressed: SuppressedLines = new Map(),
   ) {
     this.includeExtra = includeExtra;
+    this.suppressed = suppressed;
+  }
+
+  /**
+   * True when the check's line carries an `explicit: allow-<checkType>`
+   * directive. Only the opt-in extra variants consult this — the stock checks
+   * are always mandatory and never suppressible.
+   */
+  private isSuppressed(lineNumber: number, checkType: CheckType): boolean {
+    const names = this.suppressed.get(lineNumber);
+    if (names === undefined) {
+      return false;
+    }
+    return names.has(checkType);
   }
 
   analyze(): StyleCheck[] {
@@ -120,11 +142,7 @@ export class CodeVisitor {
         this.implicitBoolCheck((node as ts.DoStatement).expression, CheckType.WHILE);
         break;
       case ts.SyntaxKind.ConditionalExpression:
-        this.addCheck(
-          node,
-          CheckType.TERNARY,
-          "Ternary expression - use an explicit if/else block instead",
-        );
+        this.addCheck(node, CheckType.TERNARY, this.ternaryMessage(node));
         break;
       case ts.SyntaxKind.BinaryExpression:
         this.visitBinary(node as ts.BinaryExpression);
@@ -144,12 +162,46 @@ export class CodeVisitor {
       case ts.SyntaxKind.Parameter:
         this.checkOptionalParam(node as ts.ParameterDeclaration);
         break;
+      case ts.SyntaxKind.JsxAttribute:
+        this.checkJsxBoolAttr(node as ts.JsxAttribute);
+        break;
       default:
         break;
     }
 
     this.checkSingleLetterFor(node);
     ts.forEachChild(node, (child) => this.visit(child));
+  }
+
+  // `<Widget active />` — JSX defaults a bare attribute to true, so the reader
+  // has to supply the value from convention; `active={true}` states it.
+  private checkJsxBoolAttr(node: ts.JsxAttribute): void {
+    if (node.initializer !== undefined) {
+      return;
+    }
+    this.addCheck(
+      node,
+      CheckType.BOOL_ATTR,
+      `Bare JSX attribute relies on the implicit-true convention - write ${node.name.getText(this.sourceFile)}={true}`,
+    );
+  }
+
+  // A ternary nested in JSX cannot become an if/else in place — statements are
+  // illegal there — so the advice points outside the markup instead. The walk
+  // stops at the nearest function boundary: inside a callback an if/else block
+  // is possible again, even when the callback itself sits in JSX.
+  private ternaryMessage(node: ts.Node): string {
+    let current = node.parent;
+    while (current !== undefined) {
+      if (ts.isFunctionLike(current) === true) {
+        break;
+      }
+      if (ts.isJsxExpression(current) === true) {
+        return "Ternary expression in JSX - assign the branch with if/else before the return, or split into separate returns";
+      }
+      current = current.parent;
+    }
+    return "Ternary expression - use an explicit if/else block instead";
   }
 
   // --- implicit boolean -----------------------------------------------------
@@ -372,7 +424,15 @@ export class CodeVisitor {
   // --- arrow / function expressions -----------------------------------------
 
   private visitFunctionLike(node: ts.ArrowFunction | ts.FunctionExpression): void {
-    if (this.includeExtra.has(CheckType.ARROW) === true) {
+    let banAll = this.includeExtra.has(CheckType.ARROW);
+    if (banAll === true) {
+      if (this.isSuppressed(this.position(node).line, CheckType.ARROW) === true) {
+        // An allow-directive lifts only the opt-in ban; the stock
+        // implicit-boolean check below still applies.
+        banAll = false;
+      }
+    }
+    if (banAll === true) {
       let code: string;
       if (node.kind === ts.SyntaxKind.ArrowFunction) {
         code = "() => ...";
@@ -431,6 +491,9 @@ export class CodeVisitor {
       return;
     }
     if ((parent as ts.FunctionLikeDeclaration).body === undefined) {
+      return;
+    }
+    if (this.isSuppressed(this.position(node).line, CheckType.OPTIONAL_PARAM) === true) {
       return;
     }
 
@@ -563,6 +626,7 @@ export function analyzeAst(
   sourceFile: ts.SourceFile,
   filename: string,
   includeExtra: ReadonlySet<string> = new Set(),
+  suppressed: SuppressedLines = new Map(),
 ): StyleCheck[] {
-  return new CodeVisitor(filename, sourceFile, includeExtra).analyze();
+  return new CodeVisitor(filename, sourceFile, includeExtra, suppressed).analyze();
 }

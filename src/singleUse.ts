@@ -19,6 +19,13 @@
  *   - Exported names (the module's public surface) and `package.json` `bin`
  *     entry points are never flagged as single-use functions, since references
  *     from outside the file are invisible to a single-file analysis.
+ *
+ * One deliberate divergence from Python: a function (or function-valued
+ * variable) whose sole read passes it BY REFERENCE — `memo(Component)`,
+ * `items.map(helper)`, `onClick={handler}`, a JSX tag — is exempt. "Inline at
+ * the call site" would turn the named function into the anonymous expression
+ * this tool tells people to avoid. Python never hits this: its analogue is the
+ * decorator, which reads no name. Only a genuine call read (`helper()`) flags.
  */
 
 import ts from "typescript";
@@ -36,16 +43,23 @@ interface PendingWrite {
   at: Position;
 }
 
+interface PendingRead {
+  name: string;
+  isCall: boolean;
+}
+
 interface Scope {
   parent: Scope | undefined;
   isClass: boolean;
   declared: Set<string>;
   varDefs: Map<string, Position[]>;
   funcDefs: Map<string, Position[]>;
-  reads: string[];
+  funcValuedVars: Set<string>;
+  reads: PendingRead[];
   writes: PendingWrite[];
   ownReads: Map<string, number>;
   nestedReads: Map<string, number>;
+  ownBareReads: Map<string, number>;
 }
 
 interface ScopeContext {
@@ -109,10 +123,12 @@ function createScope(parent: Scope | undefined, isClass: boolean, ctx: ScopeCont
     declared: new Set(),
     varDefs: new Map(),
     funcDefs: new Map(),
+    funcValuedVars: new Set(),
     reads: [],
     writes: [],
     ownReads: new Map(),
     nestedReads: new Map(),
+    ownBareReads: new Map(),
   };
   ctx.scopes.push(scope);
   return scope;
@@ -122,7 +138,9 @@ function collect(node: ts.Node, scope: Scope, ctx: ScopeContext): void {
   if (ts.isFunctionDeclaration(node) === true) {
     if (node.name !== undefined) {
       scope.declared.add(node.name.text);
-      if (node.name.text !== "main") {
+      // Bodyless declarations (ambient `declare function`, overload
+      // signatures) have nothing to inline, so they are never single-use.
+      if (node.name.text !== "main" && node.body !== undefined) {
         record(scope.funcDefs, node.name.text, position(node.name, ctx.sourceFile));
       }
     }
@@ -148,6 +166,12 @@ function collect(node: ts.Node, scope: Scope, ctx: ScopeContext): void {
       EXCLUDED_NAMES.has(node.name.text) === false
     ) {
       record(scope.varDefs, node.name.text, position(node.name, ctx.sourceFile));
+      if (
+        ts.isArrowFunction(node.initializer) === true ||
+        ts.isFunctionExpression(node.initializer) === true
+      ) {
+        scope.funcValuedVars.add(node.name.text);
+      }
     }
     ts.forEachChild(node, (child) => collect(child, scope, ctx));
     return;
@@ -204,7 +228,7 @@ function collect(node: ts.Node, scope: Scope, ctx: ScopeContext): void {
 
   if (ts.isIdentifier(node) === true) {
     if (isReadReference(node) === true) {
-      scope.reads.push(node.text);
+      scope.reads.push({ name: node.text, isCall: isCallCallee(node) });
     }
     return;
   }
@@ -330,18 +354,29 @@ function resolveWrites(scopes: readonly Scope[]): void {
 
 function resolveReads(scopes: readonly Scope[]): void {
   for (const scope of scopes) {
-    for (const name of scope.reads) {
-      const target = findDeclaringScope(scope, name);
+    for (const read of scope.reads) {
+      const target = findDeclaringScope(scope, read.name);
       if (target === undefined) {
         continue;
       }
       if (target === scope) {
-        bump(target.ownReads, name);
+        bump(target.ownReads, read.name);
+        if (read.isCall === false) {
+          bump(target.ownBareReads, read.name);
+        }
       } else {
-        bump(target.nestedReads, name);
+        bump(target.nestedReads, read.name);
       }
     }
   }
+}
+
+function isCallCallee(id: ts.Identifier): boolean {
+  const parent = id.parent;
+  if (parent === undefined) {
+    return false;
+  }
+  return ts.isCallExpression(parent) === true && parent.expression === id;
 }
 
 function isReadReference(id: ts.Identifier): boolean {
@@ -352,6 +387,14 @@ function isReadReference(id: ts.Identifier): boolean {
 
   // `obj.name` — the property name is not a variable reference.
   if (ts.isPropertyAccessExpression(parent) === true && parent.name === id) {
+    return false;
+  }
+  // `<Widget value={x}/>` — the attribute name is not a variable reference.
+  if (ts.isJsxAttribute(parent) === true && parent.name === id) {
+    return false;
+  }
+  // `<svg xlink:href={x}/>` — neither half of a namespaced name is one.
+  if (ts.isJsxNamespacedName(parent) === true) {
     return false;
   }
   if (ts.isQualifiedName(parent) === true && parent.right === id) {
@@ -457,6 +500,11 @@ function flagScope(scope: Scope, ctx: ScopeContext): void {
     if (ctx.exportedNames.has(name) === true) {
       continue;
     }
+    // A function-valued binding read by reference gets the function rule:
+    // inlining it would create the anonymous expression this tool discourages.
+    if (scope.funcValuedVars.has(name) === true && scope.ownBareReads.get(name) !== undefined) {
+      continue;
+    }
     if (isFlaggableSingleUse(scope, name, positions) === true) {
       const at = positions[0]!;
       ctx.results.push({
@@ -475,6 +523,12 @@ function flagScope(scope: Scope, ctx: ScopeContext): void {
       continue;
     }
     if (ctx.entryPoints.has(name) === true || ctx.exportedNames.has(name) === true) {
+      continue;
+    }
+    // A reference read — `memo(Component)`, `items.map(helper)`, a JSX tag —
+    // passes the function by name, which is exactly what this tool asks for
+    // instead of an anonymous expression; only a call read (`helper()`) flags.
+    if (scope.ownBareReads.get(name) !== undefined) {
       continue;
     }
     if (isFlaggableSingleUse(scope, name, positions) === true) {

@@ -1,0 +1,4 @@
+{
+  "//": "Neutral config for the tests tree. Fixture expectations control their own modes explicitly (via `explicit-test:` headers and `--include-extra` flags in the harness), so the repo root's dogfood config must not leak into fixture runs — config discovery walks up from the analyzed path and stops here.",
+  "include-extra": []
+}

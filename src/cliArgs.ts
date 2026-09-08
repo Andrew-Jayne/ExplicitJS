@@ -18,7 +18,6 @@ export interface Args {
   path?: string;
   config?: string;
   format?: ReportFormat;
-  excludeType?: string[];
   includeExtra?: string[];
   statsOnly?: boolean;
   noColor?: boolean;
@@ -32,23 +31,24 @@ const HELP_TEXT = `ExplicitJS - Enforce semantic clarity in JavaScript/TypeScrip
 
 Usage:
   explicitjs <path> [options]
+  explicitjs list-checks     Describe every default check
+  explicitjs list-extras     Describe the opt-in extra checks
 
 Arguments:
   path                       File or directory to analyze
 
 Options:
   -f, --format <fmt>         Output format: ${REPORT_FORMATS.join(" | ")} (default: text)
-      --exclude-type <type>  Turn a check off entirely (repeatable)
       --include-extra <type> Opt into a stricter check that flags every
                              occurrence, not just ambiguous ones (repeatable):
                              ${[...EXTRA_CHECKS].join(", ")}
-      --config <path>        Path to a config file (package.json / .explicitrc.json)
+      --config <path>        Path to a config file (.explicitrc.json)
       --stats-only           Show only statistics, not individual checks
       --no-color             Disable colored output
       --version              Print version and exit
   -h, --help                 Show this help and exit
 
-Check types:
+Check types (always on - they cannot be disabled or suppressed):
   ${CHECK_TYPES.join(", ")}
 
 Redirect output to a file with your shell:
@@ -57,7 +57,6 @@ Redirect output to a file with your shell:
 Examples:
   explicitjs src/
   explicitjs app.ts --format json
-  explicitjs . --exclude-type ternary --exclude-type loose_equality
   explicitjs . --include-extra arrow`;
 
 export function helpText(): string {
@@ -114,19 +113,6 @@ export function parseArgs(argv: readonly string[]): Args {
           );
         }
         args.format = value as ReportFormat;
-        break;
-      }
-      case "--exclude-type": {
-        const value = next();
-        if (isCheckType(value) === false) {
-          throw new ArgError(
-            `Invalid check type '${value}'. Choose one of: ${CHECK_TYPES.join(", ")}`,
-          );
-        }
-        if (args.excludeType === undefined) {
-          args.excludeType = [];
-        }
-        args.excludeType.push(value);
         break;
       }
       case "--include-extra": {

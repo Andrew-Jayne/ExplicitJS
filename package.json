@@ -1,10 +1,10 @@
 {
   "name": "explicitjs",
-  "version": "1beta3",
-  "private": true,
+  "version": "1beta4",
+  "private": false,
   "type": "module",
   "description": "A semantic clarity enforcer for production JavaScript & TypeScript.",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "bin": {
     "explicitjs": "./dist/cli.js"
   },
@@ -13,7 +13,7 @@
   ],
   "scripts": {
     "start": "tsx src/cli.ts",
-    "lint": "tsx src/cli.ts .",
+    "lint": "tsx src/cli.ts src",
     "fmt": "biome check --write .",
     "fmt:check": "biome ci .",
     "check": "tsc --noEmit",
@@ -24,8 +24,8 @@
     "typescript": "^6.0.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.8",
-    "@types/node": "^22.10.0",
-    "tsx": "^4.19.0"
+    "@biomejs/biome": "2.5.12",
+    "@types/node": "^26.5.0",
+    "tsx": "^4.23.13"
   }
 }

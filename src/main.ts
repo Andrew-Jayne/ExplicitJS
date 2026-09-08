@@ -12,7 +12,17 @@ import type { Args } from "./cliArgs.ts";
 import { type Config, loadConfig } from "./config.ts";
 import { Colors, ReportFormat, type StyleCheck } from "./constructs.ts";
 import { analyzeFile } from "./fileHandlers.ts";
-import { formatReport, generateStatisticsReport } from "./reporters.ts";
+import {
+  formatReport,
+  generateChecksListing,
+  generateExtrasListing,
+  generateStatisticsReport,
+} from "./reporters.ts";
+
+/** Exit-code contract (mirrors the Python tool): 0 clean, 1 findings, 20 unusable invocation. */
+export const EXIT_OK = 0;
+export const EXIT_CHECKS_FOUND = 1;
+export const EXIT_ARGS_ERROR = 20;
 
 function writeErr(message: string): void {
   process.stderr.write(message);
@@ -30,6 +40,8 @@ const SOURCE_EXTENSIONS: ReadonlySet<string> = new Set([
   ".tsx",
   ".mts",
   ".cts",
+  ".svelte",
+  ".vue",
 ]);
 
 const SKIP_DIRS: ReadonlySet<string> = new Set([
@@ -53,7 +65,6 @@ interface Settings {
   noColor: boolean;
   statsOnly: boolean;
   outputFormat: ReportFormat;
-  excludeType: string[];
   includeExtra: Set<string>;
 }
 
@@ -96,7 +107,6 @@ function resolveSettings(args: Args, config: Config): Settings {
     noColor: resolveBool(args.noColor, config.noColor),
     statsOnly: resolveBool(args.statsOnly, config.statsOnly),
     outputFormat: resolveFormat(args.format, config.format),
-    excludeType: mergeList(args.excludeType, config.excludeType),
     includeExtra: new Set(mergeList(args.includeExtra, config.includeExtra)),
   };
 }
@@ -139,14 +149,30 @@ function collectFiles(target: string): string[] {
   return files;
 }
 
+/** Print a `list-checks` / `list-extras` catalog. */
+function printListing(listing: string, noColor: boolean | undefined): number {
+  if (noColor !== true && process.stdout.isTTY === true) {
+    Colors.enable();
+  }
+  writeOut(`${listing}\n`);
+  return EXIT_OK;
+}
+
 export function run(args: Args): number {
+  if (args.path === "list-checks") {
+    return printListing(generateChecksListing(), args.noColor);
+  }
+  if (args.path === "list-extras") {
+    return printListing(generateExtrasListing(), args.noColor);
+  }
+
   if (args.path === undefined) {
     writeErr("error: no path provided (see --help)\n");
-    return 1;
+    return EXIT_ARGS_ERROR;
   }
   if (existsSync(args.path) === false) {
     writeErr(`error: path does not exist: ${args.path}\n`);
-    return 1;
+    return EXIT_ARGS_ERROR;
   }
 
   let configPath: string | null = null;
@@ -162,11 +188,11 @@ export function run(args: Args): number {
 
   const files = collectFiles(args.path);
   if (files.length === 0) {
-    writeErr("error: no JavaScript/TypeScript files found to analyze\n");
-    return 1;
+    writeErr("error: no supported source files found to analyze\n");
+    return EXIT_ARGS_ERROR;
   }
 
-  let allChecks: StyleCheck[] = [];
+  const allChecks: StyleCheck[] = [];
   for (const filepath of files) {
     allChecks.push(
       ...analyzeFile(filepath, {
@@ -174,11 +200,6 @@ export function run(args: Args): number {
         entryPoints: config.entryPoints,
       }),
     );
-  }
-
-  if (settings.excludeType.length > 0) {
-    const excluded = new Set(settings.excludeType);
-    allChecks = allChecks.filter((check) => excluded.has(check.checkType) === false);
   }
 
   let report: string;
@@ -191,7 +212,7 @@ export function run(args: Args): number {
   writeOut(`${report}\n`);
 
   if (allChecks.length > 0) {
-    return 1;
+    return EXIT_CHECKS_FOUND;
   }
-  return 0;
+  return EXIT_OK;
 }

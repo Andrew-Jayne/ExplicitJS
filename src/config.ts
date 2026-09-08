@@ -14,7 +14,6 @@ import {
 
 export interface Config {
   format?: ReportFormat;
-  excludeType?: string[];
   includeExtra?: string[];
   noColor?: boolean;
   statsOnly?: boolean;
@@ -91,11 +90,6 @@ function applyTable(table: Record<string, unknown>, config: Config): void {
   const format = lookupString(table, "format");
   if (format !== undefined && isReportFormat(format) === true) {
     config.format = format;
-  }
-
-  const excludeType = lookupArray(table, "exclude-type", "excludeType");
-  if (excludeType !== undefined) {
-    config.excludeType = excludeType.filter((value) => isCheckType(value));
   }
 
   const includeExtra = lookupArray(table, "include-extra", "includeExtra");

@@ -302,6 +302,33 @@ const CASES: Case[] = [
     source: "function main(): void { doStuff(); } function doStuff(): void {}",
     expect: {},
   },
+  {
+    name: "single_use_func: passed by reference is exempt",
+    source:
+      "export function caller(): void { function helper(): number { return 1; } register(helper); }",
+    expect: {},
+  },
+  {
+    name: "single_use_func: ambient declaration is exempt",
+    source: "declare function helper(): void; helper();",
+    expect: {},
+  },
+  {
+    name: "single_use_var: function-valued binding passed by reference is exempt",
+    source:
+      "export function caller(): void { const handler = (): void => { report(1); }; register(handler); }",
+    expect: {},
+  },
+  {
+    name: "single_use_var: non-function value passed once as an argument still flags",
+    source: "export function caller(): void { const config = build(); register(config); }",
+    expect: { single_use_var: 1 },
+  },
+  {
+    name: "single_use_var: function-valued binding called once still flags",
+    source: "export function caller(): number { const helper = (): number => 1; return helper(); }",
+    expect: { single_use_var: 1 },
+  },
 
   // --- optional parameters (extra only) ---------------------------------
   {
@@ -424,3 +451,28 @@ for (const testCase of CASES) {
     assertEquals(countByType(testCase.source, extra), testCase.expect);
   });
 }
+
+// The ternary message is context-sensitive: statements are illegal inside JSX,
+// so the JSX variant must not recommend an in-place if/else block. The marker
+// harness asserts type and count only, so the wording is pinned here.
+Deno.test("ternary: message recommends if/else outside JSX", () => {
+  const inJsx = analyzeSource(
+    "export function Badge(on: boolean) { return <b>{on === true ? 'y' : 'n'}</b>; }",
+    "case.tsx",
+    { includeExtra: new Set() },
+  );
+  assertEquals(inJsx.length, 1);
+  assertEquals(inJsx[0]!.context.includes("in JSX"), true);
+  assertEquals(inJsx[0]!.context.includes("before the return"), true);
+
+  const inCallback = analyzeSource(
+    "export function Badge(on: boolean) { return <b>{render(() => (on === true ? 'y' : 'n'))}</b>; }",
+    "case.tsx",
+    { includeExtra: new Set() },
+  );
+  assertEquals(inCallback.length, 1);
+  assertEquals(
+    inCallback[0]!.context,
+    "Ternary expression - use an explicit if/else block instead",
+  );
+});

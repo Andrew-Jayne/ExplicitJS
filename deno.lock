@@ -84,9 +84,9 @@
     ],
     "packageJson": {
       "dependencies": [
-        "npm:@biomejs/biome@2.5.8",
-        "npm:@types/node@^22.10.0",
-        "npm:tsx@^4.19.0",
+        "npm:@biomejs/biome@2.5.12",
+        "npm:@types/node@^26.5.0",
+        "npm:tsx@^4.23.13",
         "npm:typescript@^6.0.3"
       ]
     }

@@ -1,17 +1,18 @@
 {
   "name": "explicitjs",
-  "version": "1beta3",
+  "version": "1beta4",
   "exports": "./src/cli.ts",
   "imports": {
     "typescript": "npm:typescript@^6.0.3"
   },
   "tasks": {
     "start": "deno run --allow-read --allow-env src/cli.ts",
-    "lint": "deno run --allow-read --allow-env src/cli.ts .",
-    "test": "deno test --allow-read --allow-env",
-    "check": "deno check src/cli.ts test/checks.test.ts",
-    "fmt": "deno run -A npm:@biomejs/biome check --write .",
-    "fmt:check": "deno run -A npm:@biomejs/biome ci ."
+    "lint": "deno run --allow-read --allow-env src/cli.ts src",
+    "test": "deno test --allow-read --allow-env --allow-run --allow-write test/",
+    "check": "deno check src/cli.ts test/fixtureSpec.ts test/checks.test.ts test/svelte.test.ts test/vue.test.ts test/markupAttrs.test.ts test/fixtures.test.ts test/self.test.ts test/cli.test.ts test/listings.test.ts test/baselines.test.ts",
+    "update-nfo": "bash scripts/update-nfo.sh",
+    "fmt": "deno run -A npm:@biomejs/biome@2.5.12 check --write .",
+    "fmt:check": "deno run -A npm:@biomejs/biome@2.5.12 ci ."
   },
   "compilerOptions": {
     "strict": true,

@@ -3,7 +3,7 @@
 # dogfood lint (ExplicitJS run on its own source). Nothing ships that fails
 # its own rules. The release also gets an npm-installable tarball attached
 # (compiled dist/, no Deno-only APIs) so Bun/npm users don't need to clone
-# the repo to use it — see README's "Prefer Bun or npm?" section.
+# the repo to use it — see docs/install.md.
 name: Release
 
 on:

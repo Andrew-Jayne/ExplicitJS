@@ -89,7 +89,7 @@ Everything else is a command-line flag: `--stats-only` and `--no-color` are choi
 
 There is no key for turning a check on or off, and no inline directive either — `// explicit: allow-if` does nothing. A construct ExplicitJS flags cannot be silenced; the tool has one mode.
 
-See [explicit.example.json](explicit.example.json) for every setting and its default.
+See [example.explicitrc.json](example.explicitrc.json) for every setting and its default.
 
 ## What is exempt
 

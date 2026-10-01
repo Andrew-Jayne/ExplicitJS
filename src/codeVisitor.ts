@@ -3,7 +3,7 @@
  * TypeScript AST. This is the JS/TS analogue of the Python tool's
  * `code_visitor.py`: it handles implicit-truthiness conditions (if/while/assert),
  * ternaries, boolean operators, arrow/function expressions, `.filter(Boolean)`,
- * loose equality, and single-letter names.
+ * loose equality, optional `name?: T` declarations, and single-letter names.
  *
  * Scope-level checks (single-use var/func) live in `singleUse.ts`.
  */
@@ -93,37 +93,46 @@ function isAccessExpression(node: ts.Node): node is AccessExpression {
   );
 }
 
-/** Line number -> extra-check names allowed by an `explicit: allow-*` directive there. */
-export type SuppressedLines = ReadonlyMap<number, ReadonlySet<string>>;
+type OptionalMember =
+  | ts.ParameterDeclaration
+  | ts.PropertySignature
+  | ts.PropertyDeclaration
+  | ts.MethodSignature
+  | ts.MethodDeclaration;
+
+const NO_INITIALIZER_MODIFIERS: ReadonlySet<ts.SyntaxKind> = new Set([
+  ts.SyntaxKind.AbstractKeyword,
+  ts.SyntaxKind.DeclareKeyword,
+]);
+
+/** True when `name: T | null = null` is legal here, not just `name: T | null`. */
+function canCarryDefault(node: OptionalMember): boolean {
+  if (ts.isParameter(node) === true) {
+    return (node.parent as ts.FunctionLikeDeclaration).body !== undefined;
+  }
+  if (ts.isPropertyDeclaration(node) === false) {
+    return false;
+  }
+  const modifiers = node.modifiers;
+  if (modifiers === undefined) {
+    return true;
+  }
+  for (const modifier of modifiers) {
+    if (NO_INITIALIZER_MODIFIERS.has(modifier.kind) === true) {
+      return false;
+    }
+  }
+  return true;
+}
 
 export class CodeVisitor {
   private readonly checks: StyleCheck[] = [];
   private readonly seenNames = new Set<string>();
-  private readonly includeExtra: ReadonlySet<string>;
-  private readonly suppressed: SuppressedLines;
 
   constructor(
     private readonly filename: string,
     private readonly sourceFile: ts.SourceFile,
-    includeExtra: ReadonlySet<string> = new Set(),
-    suppressed: SuppressedLines = new Map(),
-  ) {
-    this.includeExtra = includeExtra;
-    this.suppressed = suppressed;
-  }
-
-  /**
-   * True when the check's line carries an `explicit: allow-<checkType>`
-   * directive. Only the opt-in extra variants consult this — the stock checks
-   * are always mandatory and never suppressible.
-   */
-  private isSuppressed(lineNumber: number, checkType: CheckType): boolean {
-    const names = this.suppressed.get(lineNumber);
-    if (names === undefined) {
-      return false;
-    }
-    return names.has(checkType);
-  }
+  ) {}
 
   analyze(): StyleCheck[] {
     this.visit(this.sourceFile);
@@ -160,7 +169,11 @@ export class CodeVisitor {
         this.visitFunctionLike(node as ts.ArrowFunction | ts.FunctionExpression);
         break;
       case ts.SyntaxKind.Parameter:
-        this.checkOptionalParam(node as ts.ParameterDeclaration);
+      case ts.SyntaxKind.PropertySignature:
+      case ts.SyntaxKind.PropertyDeclaration:
+      case ts.SyntaxKind.MethodSignature:
+      case ts.SyntaxKind.MethodDeclaration:
+        this.checkOptionalMember(node as OptionalMember);
         break;
       case ts.SyntaxKind.JsxAttribute:
         this.checkJsxBoolAttr(node as ts.JsxAttribute);
@@ -424,31 +437,8 @@ export class CodeVisitor {
   // --- arrow / function expressions -----------------------------------------
 
   private visitFunctionLike(node: ts.ArrowFunction | ts.FunctionExpression): void {
-    let banAll = this.includeExtra.has(CheckType.ARROW);
-    if (banAll === true) {
-      if (this.isSuppressed(this.position(node).line, CheckType.ARROW) === true) {
-        // An allow-directive lifts only the opt-in ban; the stock
-        // implicit-boolean check below still applies.
-        banAll = false;
-      }
-    }
-    if (banAll === true) {
-      let code: string;
-      if (node.kind === ts.SyntaxKind.ArrowFunction) {
-        code = "() => ...";
-      } else {
-        code = "function () { ... }";
-      }
-      this.addCheck(
-        node,
-        CheckType.ARROW,
-        "Anonymous function - use a named function (arrow in include-extra)",
-        code,
-      );
-      return;
-    }
-
-    // Default mode: only flag a concise arrow body that buries a boolean.
+    // Anonymity itself is not ambiguous — only a concise arrow body that
+    // buries a boolean is, so that is all this flags.
     if (ts.isArrowFunction(node) === false) {
       return;
     }
@@ -469,43 +459,55 @@ export class CodeVisitor {
     }
   }
 
-  // --- optional parameters (include-extra) ----------------------------------
+  // --- optional parameters, properties and methods --------------------------
 
   /**
-   * Flag `arg?: T` in a function implementation: whether `undefined` is
-   * meaningful or accidental is invisible at the call site. The explicit form
-   * `arg: T | null = null` names the absent value and documents the default.
-   * Type-space signatures (interfaces, function types, overload declarations)
-   * cannot carry defaults, so only implementations — parents with a body —
-   * are flagged.
+   * Flag every `name?: T` declaration: whether the absent value is meaningful
+   * or accidental is invisible at the call site, and an optional field is what
+   * makes `response?.data?.messages` look reasonable downstream. `name: T |
+   * null` names the absent value and forces an explicit null check instead.
+   *
+   * Where a default is legal — a parameter of an implementation, a concrete
+   * class field — the advice adds `= null`, so existing callers keep working.
+   * Type-space declarations (interfaces, type literals, overload signatures,
+   * abstract and `declare` fields) cannot carry one, so there the advice stops
+   * at the union and every construction site states the field.
    */
-  private checkOptionalParam(node: ts.ParameterDeclaration): void {
-    if (this.includeExtra.has(CheckType.OPTIONAL_PARAM) === false) {
-      return;
-    }
+  private checkOptionalMember(node: OptionalMember): void {
     if (node.questionToken === undefined) {
       return;
     }
-    const parent = node.parent;
-    if (ts.isFunctionLike(parent) === false) {
-      return;
-    }
-    if ((parent as ts.FunctionLikeDeclaration).body === undefined) {
-      return;
-    }
-    if (this.isSuppressed(this.position(node).line, CheckType.OPTIONAL_PARAM) === true) {
+    if (ts.isParameter(node) === true && ts.isFunctionLike(node.parent) === false) {
       return;
     }
 
     const name = node.name.getText(this.sourceFile);
+    if (ts.isMethodSignature(node) === true || ts.isMethodDeclaration(node) === true) {
+      this.addCheck(
+        node,
+        CheckType.OPTIONAL_PARAM,
+        `Optional method '${name}?()' leaves absence implicit - declare it required, or as a '${name}: <signature> | null' property`,
+        `${name}?()`,
+      );
+      return;
+    }
+
+    let kind = "property";
+    if (ts.isParameter(node) === true) {
+      kind = "parameter";
+    }
     let typeText = "T";
     if (node.type !== undefined) {
       typeText = truncate(node.type.getText(this.sourceFile));
     }
+    let suffix = "";
+    if (canCarryDefault(node) === true) {
+      suffix = " = null";
+    }
     this.addCheck(
       node,
       CheckType.OPTIONAL_PARAM,
-      `Optional parameter '${name}?' leaves absence implicit - use '${name}: ${typeText} | null = null' (optional_param in include-extra)`,
+      `Optional ${kind} '${name}?' leaves absence implicit - use '${name}: ${typeText} | null${suffix}'`,
     );
   }
 
@@ -622,11 +624,6 @@ export class CodeVisitor {
   }
 }
 
-export function analyzeAst(
-  sourceFile: ts.SourceFile,
-  filename: string,
-  includeExtra: ReadonlySet<string> = new Set(),
-  suppressed: SuppressedLines = new Map(),
-): StyleCheck[] {
-  return new CodeVisitor(filename, sourceFile, includeExtra, suppressed).analyze();
+export function analyzeAst(sourceFile: ts.SourceFile, filename: string): StyleCheck[] {
+  return new CodeVisitor(filename, sourceFile).analyze();
 }

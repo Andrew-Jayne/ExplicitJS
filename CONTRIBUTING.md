@@ -17,12 +17,12 @@ Clone the repo and pick a runtime — see [docs/install.md](docs/install.md#from
 
 Nothing ships that fails its own rules. Before a release tag is published, CI runs the type check, the tests, Biome, and the dogfood lint; all four must exit clean.
 
-- ExplicitJS lints itself with its own [.explicitrc.json](.explicitrc.json), including the opt-in `optional_param` check. The test suite enforces the same via a self check and committed baselines in [nfo/](nfo/).
+- ExplicitJS lints itself: `deno task lint` runs it over `src/`, which must stay at zero findings. Every check is mandatory, so there is no config file to carry. The test suite enforces the same via a self check and committed baselines in [nfo/](nfo/).
 - Code style is enforced by [Biome](https://biomejs.dev/) via [biome.json](biome.json).
 
 ## Tests
 
-The suite (see [test/README.md](test/README.md)) is fixture-driven: real annotated source files in `test/default_checks/` and `test/extra_checks/` carry trailing `// expect:` markers that the harness verifies against the analyzer, in-process and through the real CLI. Table-driven edge cases live in [test/checks.test.ts](test/checks.test.ts).
+The suite (see [test/README.md](test/README.md)) is fixture-driven: real annotated source files in `test/fixtures/` carry trailing `// expect:` markers that the harness verifies against the analyzer, in-process and through the real CLI. Table-driven edge cases live in [test/checks.test.ts](test/checks.test.ts).
 
 The suite uses Deno's built-in test runner and `jsr:@std/assert`, so `deno task test` is currently the only way to run it, even if you develop with Bun or npm.
 

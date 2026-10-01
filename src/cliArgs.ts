@@ -1,26 +1,17 @@
 /**
  * Hand-rolled argument parser (no dependencies). Flag-backed fields default to
- * `undefined` ("not specified") so a config-file value can fill them in;
- * resolution happens in `main.ts`, where the CLI always wins.
+ * `null` ("not specified") so a config-file value can fill them in; resolution
+ * happens in `main.ts`, where the CLI always wins.
  */
 
-import {
-  CHECK_TYPES,
-  type CheckType,
-  EXTRA_CHECKS,
-  isCheckType,
-  isReportFormat,
-  REPORT_FORMATS,
-  type ReportFormat,
-} from "./constructs.ts";
+import { CHECK_TYPES, isReportFormat, REPORT_FORMATS, type ReportFormat } from "./constructs.ts";
 
 export interface Args {
-  path?: string;
-  config?: string;
-  format?: ReportFormat;
-  includeExtra?: string[];
-  statsOnly?: boolean;
-  noColor?: boolean;
+  path: string | null;
+  config: string | null;
+  format: ReportFormat | null;
+  statsOnly: boolean | null;
+  noColor: boolean | null;
   showHelp: boolean;
   showVersion: boolean;
 }
@@ -31,24 +22,20 @@ const HELP_TEXT = `ExplicitJS - Enforce semantic clarity in JavaScript/TypeScrip
 
 Usage:
   explicitjs <path> [options]
-  explicitjs list-checks     Describe every default check
-  explicitjs list-extras     Describe the opt-in extra checks
+  explicitjs list-checks     Describe every check
 
 Arguments:
   path                       File or directory to analyze
 
 Options:
   -f, --format <fmt>         Output format: ${REPORT_FORMATS.join(" | ")} (default: text)
-      --include-extra <type> Opt into a stricter check that flags every
-                             occurrence, not just ambiguous ones (repeatable):
-                             ${[...EXTRA_CHECKS].join(", ")}
       --config <path>        Path to a config file (.explicitrc.json)
       --stats-only           Show only statistics, not individual checks
       --no-color             Disable colored output
       --version              Print version and exit
   -h, --help                 Show this help and exit
 
-Check types (always on - they cannot be disabled or suppressed):
+Checks (all of them always on - none can be disabled or suppressed):
   ${CHECK_TYPES.join(", ")}
 
 Redirect output to a file with your shell:
@@ -57,7 +44,7 @@ Redirect output to a file with your shell:
 Examples:
   explicitjs src/
   explicitjs app.ts --format json
-  explicitjs . --include-extra arrow`;
+  explicitjs src/ --stats-only`;
 
 export function helpText(): string {
   return HELP_TEXT;
@@ -71,7 +58,15 @@ function requireValue(flag: string, value: string | undefined): string {
 }
 
 export function parseArgs(argv: readonly string[]): Args {
-  const args: Args = { showHelp: false, showVersion: false };
+  const args: Args = {
+    path: null,
+    config: null,
+    format: null,
+    statsOnly: null,
+    noColor: null,
+    showHelp: false,
+    showVersion: false,
+  };
   const positionals: string[] = [];
 
   let index = 0;
@@ -115,19 +110,6 @@ export function parseArgs(argv: readonly string[]): Args {
         args.format = value as ReportFormat;
         break;
       }
-      case "--include-extra": {
-        const value = next();
-        if (isCheckType(value) === false || EXTRA_CHECKS.has(value as CheckType) === false) {
-          throw new ArgError(
-            `Invalid extra check '${value}'. Choose one of: ${[...EXTRA_CHECKS].join(", ")}`,
-          );
-        }
-        if (args.includeExtra === undefined) {
-          args.includeExtra = [];
-        }
-        args.includeExtra.push(value);
-        break;
-      }
       case "--config":
         args.config = next();
         break;
@@ -150,7 +132,7 @@ export function parseArgs(argv: readonly string[]): Args {
     throw new ArgError(`Unexpected extra argument '${positionals[1]}' - only one path is allowed`);
   }
   if (positionals.length > 0) {
-    args.path = positionals[0];
+    args.path = positionals[0]!;
   }
   return args;
 }

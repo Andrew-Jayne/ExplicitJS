@@ -8,7 +8,6 @@ import {
   CHECK_TYPES,
   CheckType,
   Colors,
-  EXTRA_DESCRIPTIONS,
   ReportFormat,
   type StyleCheck,
 } from "./constructs.ts";
@@ -225,32 +224,7 @@ export function generateChecksListing(): string {
   }
   output.push("");
   output.push(
-    Colors.paint(
-      Colors.DIM,
-      "Default checks are always on - they cannot be disabled or suppressed.",
-    ),
-  );
-  output.push(Colors.paint(Colors.DIM, "Stricter opt-in variants: 'explicitjs list-extras'."));
-  return output.join("\n");
-}
-
-/** Render the `list-extras` command: the opt-in strict checks. */
-export function generateExtrasListing(): string {
-  const output: string[] = [];
-  output.push(Colors.paint(Colors.BOLD + Colors.CYAN, "\nExtra checks (opt-in)"));
-  output.push(Colors.paint(Colors.GRAY, "═".repeat(50)));
-  for (const [checkType, description] of Object.entries(EXTRA_DESCRIPTIONS)) {
-    output.push(`  ${Colors.paint(typeColor(checkType), padEnd(checkType, 20))} ${description}`);
-  }
-  output.push("");
-  output.push(
-    Colors.paint(Colors.DIM, "Opt in with --include-extra, or include-extra in .explicitrc.json."),
-  );
-  output.push(
-    Colors.paint(
-      Colors.DIM,
-      "Suppress a flagged line with a trailing '// explicit: allow-<name>'.",
-    ),
+    Colors.paint(Colors.DIM, "Every check is always on - none can be disabled or suppressed."),
   );
   return output.join("\n");
 }

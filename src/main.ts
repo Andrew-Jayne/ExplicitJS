@@ -12,12 +12,7 @@ import type { Args } from "./cliArgs.ts";
 import { type Config, loadConfig } from "./config.ts";
 import { Colors, ReportFormat, type StyleCheck } from "./constructs.ts";
 import { analyzeFile } from "./fileHandlers.ts";
-import {
-  formatReport,
-  generateChecksListing,
-  generateExtrasListing,
-  generateStatisticsReport,
-} from "./reporters.ts";
+import { formatReport, generateChecksListing, generateStatisticsReport } from "./reporters.ts";
 
 /** Exit-code contract (mirrors the Python tool): 0 clean, 1 findings, 20 unusable invocation. */
 export const EXIT_OK = 0;
@@ -44,6 +39,8 @@ const SOURCE_EXTENSIONS: ReadonlySet<string> = new Set([
   ".vue",
 ]);
 
+// Always skipped, whatever the config says: no `ignore` list can re-enable a
+// dependency or build tree, it can only add to this set.
 const SKIP_DIRS: ReadonlySet<string> = new Set([
   "node_modules",
   ".git",
@@ -65,38 +62,13 @@ interface Settings {
   noColor: boolean;
   statsOnly: boolean;
   outputFormat: ReportFormat;
-  includeExtra: Set<string>;
 }
 
-function resolveBool(cli: boolean | undefined, config: boolean | undefined): boolean {
-  if (cli !== undefined) {
+function resolveFormat(cli: ReportFormat | null, config: ReportFormat | null): ReportFormat {
+  if (cli !== null) {
     return cli;
   }
-  if (config !== undefined) {
-    return config;
-  }
-  return false;
-}
-
-function mergeList(cli: string[] | undefined, config: string[] | undefined): string[] {
-  const merged: string[] = [];
-  if (config !== undefined) {
-    merged.push(...config);
-  }
-  if (cli !== undefined) {
-    merged.push(...cli);
-  }
-  return merged;
-}
-
-function resolveFormat(
-  cli: ReportFormat | undefined,
-  config: ReportFormat | undefined,
-): ReportFormat {
-  if (cli !== undefined) {
-    return cli;
-  }
-  if (config !== undefined) {
+  if (config !== null) {
     return config;
   }
   return ReportFormat.TEXT;
@@ -104,10 +76,9 @@ function resolveFormat(
 
 function resolveSettings(args: Args, config: Config): Settings {
   return {
-    noColor: resolveBool(args.noColor, config.noColor),
-    statsOnly: resolveBool(args.statsOnly, config.statsOnly),
+    noColor: args.noColor === true,
+    statsOnly: args.statsOnly === true,
     outputFormat: resolveFormat(args.format, config.format),
-    includeExtra: new Set(mergeList(args.includeExtra, config.includeExtra)),
   };
 }
 
@@ -118,7 +89,17 @@ function isSupportedFile(filepath: string): boolean {
   return SOURCE_EXTENSIONS.has(path.extname(filepath).toLowerCase());
 }
 
-function collectFiles(target: string): string[] {
+function isIgnoredDir(name: string, fullPath: string, config: Config): boolean {
+  if (SKIP_DIRS.has(name) === true || name.startsWith(".") === true) {
+    return true;
+  }
+  if (config.ignoreNames.has(name) === true) {
+    return true;
+  }
+  return config.ignorePaths.has(path.resolve(fullPath));
+}
+
+function collectFiles(target: string, config: Config): string[] {
   const files: string[] = [];
 
   if (statSync(target).isFile() === true) {
@@ -137,7 +118,7 @@ function collectFiles(target: string): string[] {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory() === true) {
-        if (SKIP_DIRS.has(entry.name) === false && entry.name.startsWith(".") === false) {
+        if (isIgnoredDir(entry.name, full, config) === false) {
           pending.push(full);
         }
       } else if (entry.isFile() === true && isSupportedFile(full) === true) {
@@ -149,8 +130,8 @@ function collectFiles(target: string): string[] {
   return files;
 }
 
-/** Print a `list-checks` / `list-extras` catalog. */
-function printListing(listing: string, noColor: boolean | undefined): number {
+/** Print the `list-checks` catalog. */
+function printListing(listing: string, noColor: boolean | null): number {
   if (noColor !== true && process.stdout.isTTY === true) {
     Colors.enable();
   }
@@ -162,11 +143,7 @@ export function run(args: Args): number {
   if (args.path === "list-checks") {
     return printListing(generateChecksListing(), args.noColor);
   }
-  if (args.path === "list-extras") {
-    return printListing(generateExtrasListing(), args.noColor);
-  }
-
-  if (args.path === undefined) {
+  if (args.path === null) {
     writeErr("error: no path provided (see --help)\n");
     return EXIT_ARGS_ERROR;
   }
@@ -175,18 +152,14 @@ export function run(args: Args): number {
     return EXIT_ARGS_ERROR;
   }
 
-  let configPath: string | null = null;
-  if (args.config !== undefined) {
-    configPath = args.config;
-  }
-  const config = loadConfig(args.path, configPath);
+  const config = loadConfig(args.path, args.config);
   const settings = resolveSettings(args, config);
 
   if (settings.noColor !== true && process.stdout.isTTY === true) {
     Colors.enable();
   }
 
-  const files = collectFiles(args.path);
+  const files = collectFiles(args.path, config);
   if (files.length === 0) {
     writeErr("error: no supported source files found to analyze\n");
     return EXIT_ARGS_ERROR;
@@ -194,12 +167,7 @@ export function run(args: Args): number {
 
   const allChecks: StyleCheck[] = [];
   for (const filepath of files) {
-    allChecks.push(
-      ...analyzeFile(filepath, {
-        includeExtra: settings.includeExtra,
-        entryPoints: config.entryPoints,
-      }),
-    );
+    allChecks.push(...analyzeFile(filepath));
   }
 
   let report: string;

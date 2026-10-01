@@ -7,7 +7,7 @@ import process from "node:process";
 import { ArgError, type Args, helpText, parseArgs } from "./cliArgs.ts";
 import { EXIT_ARGS_ERROR, run } from "./main.ts";
 
-const VERSION = "1beta4";
+const VERSION = "1beta5";
 
 function writeErr(message: string): void {
   process.stderr.write(message);

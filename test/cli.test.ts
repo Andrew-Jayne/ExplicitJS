@@ -2,17 +2,17 @@
  * CLI end-to-end tests: the real executable, real JSON, real exit codes.
  *
  * These cover what the in-process harness cannot: argument parsing, config
- * discovery, the JSON reporter, the listing commands, and the exit-code
+ * discovery, the JSON reporter, the list-checks command, and the exit-code
  * contract (0 clean, 1 findings, 20 bad args).
  */
 
 import { assertEquals, assertNotEquals } from "jsr:@std/assert@^1.0.19";
 import path from "node:path";
-import { CHECK_TYPES, EXTRA_CHECKS } from "../src/constructs.ts";
+import { CHECK_TYPES } from "../src/constructs.ts";
 import {
   type CheckCounter,
   countersEqual,
-  fixturesWithMode,
+  discoverFixtures,
   formatDiff,
   incrementCount,
   parseFixture,
@@ -53,22 +53,14 @@ function jsonToCounter(stdout: string): CheckCounter {
   return counter;
 }
 
-function assertCliMatchesMarkers(fixturePath: string, mode: string): void {
-  const spec = parseFixture(fixturePath);
-  const expected = spec.expected.get(mode)!;
-
-  const cliArgs = [fixturePath, "--format", "json"];
-  if (mode === "extra") {
-    for (const extra of [...spec.extras].sort()) {
-      cliArgs.push("--include-extra", extra);
-    }
-  }
-  const result = runCli(cliArgs);
+function assertCliMatchesMarkers(fixturePath: string): void {
+  const expected = parseFixture(fixturePath).expected;
+  const result = runCli([fixturePath, "--format", "json"]);
   const actual = jsonToCounter(result.stdout);
 
   if (countersEqual(expected, actual) === false) {
     throw new Error(
-      `\n${path.basename(fixturePath)} [${mode}] CLI JSON mismatch:\n${formatDiff(expected, actual)}`,
+      `\n${path.basename(fixturePath)} CLI JSON mismatch:\n${formatDiff(expected, actual)}`,
     );
   }
   if (expected.size > 0) {
@@ -78,15 +70,9 @@ function assertCliMatchesMarkers(fixturePath: string, mode: string): void {
   }
 }
 
-for (const fixturePath of fixturesWithMode("default")) {
-  Deno.test(`cli json: ${path.basename(fixturePath)} [default]`, () => {
-    assertCliMatchesMarkers(fixturePath, "default");
-  });
-}
-
-for (const fixturePath of fixturesWithMode("extra")) {
-  Deno.test(`cli json: ${path.basename(fixturePath)} [extra]`, () => {
-    assertCliMatchesMarkers(fixturePath, "extra");
+for (const fixturePath of discoverFixtures()) {
+  Deno.test(`cli json: ${path.basename(fixturePath)}`, () => {
+    assertCliMatchesMarkers(fixturePath);
   });
 }
 
@@ -109,16 +95,10 @@ Deno.test("cli exit code: unusable invocations exit 20", () => {
   assertEquals(runCli(["this_file_does_not_exist.ts"]).code, 20);
 });
 
-Deno.test("cli listing commands print their catalogs and exit 0", () => {
+Deno.test("cli list-checks prints the catalog and exits 0", () => {
   const checksResult = runCli(["list-checks"]);
   assertEquals(checksResult.code, 0);
   for (const checkType of CHECK_TYPES) {
     assertEquals(checksResult.stdout.includes(checkType), true, checkType);
-  }
-
-  const extrasResult = runCli(["list-extras"]);
-  assertEquals(extrasResult.code, 0);
-  for (const extra of EXTRA_CHECKS) {
-    assertEquals(extrasResult.stdout.includes(extra), true, extra);
   }
 });

@@ -1,16 +1,13 @@
 {
-  "//": "Example .explicitrc.json. Drop this file at the root of the project you want ExplicitJS to analyze (it walks up from the analyzed path looking for it). Every key is optional; the value shown is the default used when the key is omitted. Command-line flags always override these values, and include-extra is merged with its --include-extra counterpart on the CLI. The default checks are always on - they cannot be disabled or suppressed; run 'explicitjs list-checks' for the full catalog.",
+  "//": "Example .explicitrc.json. Drop this file at the root of the project you want ExplicitJS to analyze (it walks up from the analyzed path looking for it, or point at it with --config). These two keys are the whole surface: checks are not configurable - every check is always on, and none can be disabled or suppressed. Per-run choices (--stats-only, --no-color) are command-line flags only. Run 'explicitjs list-checks' for the full catalog.",
   "format": "text",
-  "include-extra": [],
-  "//include-extra": [
-    "Opt into stricter checks. Defaults to []. Valid values:",
-    "  arrow          - flag ALL arrow / function expressions, not just the",
-    "                   ambiguous (implicit-boolean) ones flagged by default",
-    "  optional_param - flag arg?: T in function implementations; prefer the",
-    "                   explicit arg: T | null = null",
-    "Suppress an extra on one line with a trailing '// explicit: allow-<name>'",
-    "directive (run 'explicitjs list-extras'); the default checks ignore it."
-  ],
-  "no-color": false,
-  "stats-only": false
+  "//format": "text | json | csv. Defaults to text. --format always overrides it.",
+  "ignore": [],
+  "//ignore": [
+    "Extra directories to skip, on top of the built-in list (node_modules,",
+    "dist, build, out, coverage, vendor, dotfile directories, ...), which no",
+    "config can re-enable. A bare name skips that directory at any depth; an",
+    "entry containing a separator is a path relative to THIS file. Directories",
+    "only - there are no file patterns and no globs."
+  ]
 }

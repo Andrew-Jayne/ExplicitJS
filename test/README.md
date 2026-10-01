@@ -6,13 +6,13 @@ The suite mirrors the Python `explicit` project's fixture-marker architecture.
 
 | File | What it exercises |
 |---|---|
-| `default_checks/test_*` | **Fixtures, not tests** — real source (`.ts`, `.svelte`, `.vue`) annotated with expectation markers (see grammar below). One fixture per always-on check. |
-| `extra_checks/test_*` | Fixtures for the opt-in `--include-extra` checks (`arrow`, `optional_param`) and the `// explicit: allow-*` directive. These declare both modes, since the stock variant still applies. |
+| `fixtures/test_*` | **Fixtures, not tests** — real source (`.ts`, `.svelte`, `.vue`) annotated with expectation markers (see grammar below). One fixture per check. |
 | `fixtureSpec.ts` | Shared helpers: the marker parser (`parseFixture`), fixture discovery, diff formatting. Not a test file. |
 | `fixtures.test.ts` | The harness: markers vs. analyzer, plus fixture syntax validation (`ts.transpileModule` diagnostics). |
-| `self.test.ts` | The self check: every `src/*.ts` source file must pass its own linter (with the dogfood `optional_param` extra). |
-| `cli.test.ts` | End-to-end through the real CLI: JSON output vs. markers, exit codes, listing commands. |
-| `listings.test.ts` | Every check must have a description in `list-checks` / `list-extras`. |
+| `self.test.ts` | The self check: every `src/*.ts` source file must pass its own linter. |
+| `cli.test.ts` | End-to-end through the real CLI: JSON output vs. markers, exit codes, `list-checks`. |
+| `listings.test.ts` | Every check must have a description in `list-checks`. |
+| `config.test.ts` | The two `.explicitrc.json` keys (`format`, `ignore`) driven through the real CLI over a temp project, plus what the file cannot do. |
 | `baselines.test.ts` | Live lint runs must match the committed outputs in `nfo/` at the repo root. |
 | `checks.test.ts`, `svelte.test.ts`, `vue.test.ts` | The older table-driven/unit suites, kept alongside: inline snippets for check edge cases and the SFC extractors. |
 | `markupAttrs.test.ts` | The bare-attribute template scanner (`bool_attr`): directive exemptions and scan hazards (comments, quoted `>`, brace expressions). |
@@ -22,12 +22,12 @@ Deno's test runner collects only `*.test.ts` files, so the `test_*` fixtures are
 to undefined helpers, and type-checking would reject the undeclared names. They
 are only read as text and parsed (via `analyzeFile`) or transpiled (via
 `ts.transpileModule`, which validates syntax without executing). Biome ignores
-the fixture directories for the same reason (`biome.json`), and `tsconfig.json`
+the fixture directory for the same reason (`biome.json`), and `tsconfig.json`
 includes only `src/`.
 
-`.explicitrc.json` here is deliberately neutral: config discovery walks up from
-the analyzed path, and without it the repo root's dogfood config (which enables
-`optional_param`) would leak into fixture runs.
+There is no `.explicitrc.json` anywhere in the repo: every check is mandatory,
+so a fixture run has nothing to configure and nothing can leak into it. The
+config tests build their own throwaway projects under a temp directory.
 
 ## Marker grammar
 
@@ -42,7 +42,7 @@ assert(first && second);       // expect: assert, assert, bool_op, bool_op
 - The spec is a comma-separated list of check-type names (see `CheckType`).
 - Repeat a name to assert it is reported that many times on the line (a single
   line can legitimately produce several checks, e.g. one per boolean operand).
-- A line with **no** marker must produce **zero** checks in every mode.
+- A line with **no** marker must produce **zero** checks.
 - The harness asserts type + count per line, **not** column (column is an
   implementation detail).
 - In `.svelte`/`.vue` fixtures the markers sit inside the script blocks; line
@@ -52,28 +52,6 @@ assert(first && second);       // expect: assert, assert, bool_op, bool_op
   JSX **text node**, not a comment (`//` has no comment meaning there). The
   marker parser matches on raw line text so it works either way, and fixtures
   are only ever parsed — never rendered — so the stray text is harmless.
-
-## Modes
-
-Checks with a stricter opt-in variant (`arrow`, `optional_param`) are
-exercised in both configurations. A fixture declares its modes in a header
-comment within its first 10 lines:
-
-```ts
-// explicit-test: modes=default,extra; extra=arrow
-```
-
-`modes` lists the analyzer configurations to run (`default` = no extras,
-`extra` = all listed extras enabled). No header means `modes=default` with no
-extras. Per-item mode qualifiers restrict an expectation to one mode:
-
-```ts
-report(values.map((value) => value + 1)); // expect: arrow@extra
-```
-
-An `// explicit: allow-<name>` directive on a marked line must come **before**
-the `// expect:` marker, or the directive text would be parsed as part of the
-expectation spec.
 
 ## Baselines (`nfo/` at the repo root)
 

@@ -48,19 +48,9 @@ export function isCheckType(value: string): value is CheckType {
 }
 
 /**
- * Opt-in checks, enabled via `include-extra`. `arrow` by default only flags an
- * ambiguous (implicit-boolean) use and is upgraded here to flag *every*
- * occurrence; `optional_param` runs only when opted in.
- */
-export const EXTRA_CHECKS: ReadonlySet<CheckType> = new Set([
-  CheckType.ARROW,
-  CheckType.OPTIONAL_PARAM,
-]);
-
-/**
- * One-line explanation of every check in its default-mode behavior, shown by
- * the `list-checks` command. Every CheckType member must have an entry, in
- * registry order (asserted by the test suite).
+ * One-line explanation of every check, shown by the `list-checks` command.
+ * Every CheckType member must have an entry, in registry order (asserted by
+ * the test suite).
  */
 export const CHECK_DESCRIPTIONS: Readonly<Record<CheckType, string>> = {
   [CheckType.IF]:
@@ -79,7 +69,7 @@ export const CHECK_DESCRIPTIONS: Readonly<Record<CheckType, string>> = {
   [CheckType.BOOL_ATTR]:
     "Bare attribute in JSX or a Svelte/Vue template ('<Widget active />') relies on the implicit-true convention - write the value out (active={true}, :active=\"true\")",
   [CheckType.ARROW]:
-    "Arrow/function expression hiding an implicit-boolean body - use a named function (the 'arrow' extra bans all anonymous functions)",
+    "Arrow/function expression hiding an implicit-boolean body - use a named function with explicit comparisons",
   [CheckType.FILTER]:
     "'.filter(Boolean)' uses implicit truthiness as the predicate - pass an explicit predicate",
   [CheckType.LOOSE_EQUALITY]: "Loose '==' / '!=' coerces operands - use '===' / '!=='",
@@ -90,19 +80,7 @@ export const CHECK_DESCRIPTIONS: Readonly<Record<CheckType, string>> = {
   [CheckType.SINGLE_USE_FUNC]:
     "Function called exactly once - inline it at the call site (exports and 'main' are exempt)",
   [CheckType.OPTIONAL_PARAM]:
-    "Off by default - opt in with the 'optional_param' extra (see 'explicitjs list-extras')",
-};
-
-/**
- * One-line explanation of what each opt-in extra adds over the default mode,
- * shown by the `list-extras` command. Every EXTRA_CHECKS member must have an
- * entry (asserted by the test suite).
- */
-export const EXTRA_DESCRIPTIONS: Readonly<Partial<Record<CheckType, string>>> = {
-  [CheckType.ARROW]:
-    "Ban every arrow/function expression, not just ambiguous ones - anonymous logic has no name to describe intent; use named functions",
-  [CheckType.OPTIONAL_PARAM]:
-    "Ban 'arg?: T' in function implementations - 'arg: T | null = null' names the absent value and documents the default",
+    "Optional 'name?: T' parameter, property or method - write 'name: T | null' (plus '= null' where a default is legal) so the absent value is named and callers must handle it",
 };
 
 export interface StyleCheck {

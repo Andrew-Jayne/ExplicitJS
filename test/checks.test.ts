@@ -7,9 +7,6 @@
  * or executes — so snippets can reference undeclared identifiers freely; that
  * keeps expression-level cases (if/while/ternary/…) free of scaffolding noise.
  * Declaration-based checks (single_use_*, single_letter_var) use real bindings.
- *
- * `extra` opts a case into the stricter `include-extra` variant of a check
- * (currently only `arrow`), mirroring the CLI's `--include-extra` flag.
  */
 
 import { assertEquals } from "jsr:@std/assert@^1.0.19";
@@ -22,14 +19,13 @@ interface Case {
   name: string;
   source: string;
   expect: Counts;
-  extra?: CheckType[];
 }
 
 const VALID = new Set<string>(CHECK_TYPES);
 
-function countByType(source: string, extra: CheckType[]): Counts {
+function countByType(source: string): Counts {
   const counts: Counts = {};
-  for (const check of analyzeSource(source, "case.ts", { includeExtra: new Set(extra) })) {
+  for (const check of analyzeSource(source, "case.ts")) {
     const current = counts[check.checkType];
     if (current === undefined) {
       counts[check.checkType] = 1;
@@ -330,109 +326,109 @@ const CASES: Case[] = [
     expect: { single_use_var: 1 },
   },
 
-  // --- optional parameters (extra only) ---------------------------------
+  // --- optional parameters, properties and methods ----------------------
   {
-    name: "optional_param: not flagged by default",
+    name: "optional_param: parameter of an implementation",
     source: "export function fn(config?: Options): void {}",
-    expect: {},
-  },
-  {
-    name: "optional_param: flagged with extra",
-    source: "export function fn(config?: Options): void {}",
-    extra: ["optional_param" as CheckType],
     expect: { optional_param: 1 },
   },
   {
     name: "optional_param: explicit null default is clean",
     source: "export function fn(config: Options | null = null): void {}",
-    extra: ["optional_param" as CheckType],
     expect: {},
   },
   {
-    name: "optional_param: method parameter flagged",
+    name: "optional_param: method parameter",
     source: "export class Api { fetch(query?: string): void {} }",
-    extra: ["optional_param" as CheckType],
     expect: { optional_param: 1 },
   },
   {
-    name: "optional_param: arrow parameter flagged",
+    name: "optional_param: arrow parameter",
     source: "export const handler = (event?: Event): number => 1;",
-    extra: ["optional_param" as CheckType],
     expect: { optional_param: 1 },
   },
   {
-    name: "optional_param: interface signature is exempt",
+    name: "optional_param: parameter of an interface method signature",
     source: "export interface Api { fetch(query?: string): void; }",
-    extra: ["optional_param" as CheckType],
-    expect: {},
+    expect: { optional_param: 1 },
   },
   {
-    name: "optional_param: overload declaration is exempt, implementation is not",
+    name: "optional_param: overload declaration and implementation are both flagged",
     source:
       "export function fn(query?: string): void; export function fn(query?: string): void { use(query); }",
-    extra: ["optional_param" as CheckType],
+    expect: { optional_param: 2 },
+  },
+  {
+    name: "optional_param: interface property",
+    source: "export interface Options { label?: string; }",
     expect: { optional_param: 1 },
   },
-
-  // --- arrow / function expressions (default vs. extra) -----------------
   {
-    name: "arrow: ternary body is ambiguous (default)",
+    name: "optional_param: type literal property",
+    source: "export type Options = { label?: string };",
+    expect: { optional_param: 1 },
+  },
+  {
+    name: "optional_param: class property",
+    source: "export class Box { private label?: string; }",
+    expect: { optional_param: 1 },
+  },
+  {
+    name: "optional_param: optional method signature",
+    source: "export interface Hooks { onClose?(): void; }",
+    expect: { optional_param: 1 },
+  },
+  {
+    name: "optional_param: optional class method",
+    source: "export class Hooks { onClose?(): void {} }",
+    expect: { optional_param: 1 },
+  },
+  {
+    name: "optional_param: nullable property is clean",
+    source: "export interface Options { label: string | null; }",
+    expect: {},
+  },
+  {
+    name: "optional_param: optional tuple member is out of scope",
+    source: "export type Pair = [name: string, label?: string];",
+    expect: {},
+  },
+
+  // --- arrow / function expressions --------------------------------------
+  {
+    name: "arrow: ternary body is ambiguous",
     source: "(val) => (val ? 1 : 0);",
     expect: { arrow: 1, ternary: 1 },
   },
   {
-    name: "arrow: && body is ambiguous (default)",
+    name: "arrow: && body is ambiguous",
     source: "(val) => val && nums;",
     expect: { arrow: 1, bool_op: 2 },
   },
   {
-    name: "arrow: negation body is ambiguous (default)",
+    name: "arrow: negation body is ambiguous",
     source: "(val) => !val;",
     expect: { arrow: 1 },
   },
   {
-    name: "arrow: comparison body not flagged by default",
+    name: "arrow: comparison body is explicit",
     source: "(val) => val === 0;",
     expect: {},
   },
   {
-    name: "arrow: comparison body flagged with extra",
-    source: "(val) => val === 0;",
-    extra: ["arrow" as CheckType],
-    expect: { arrow: 1 },
-  },
-  {
-    name: "arrow: arithmetic body not flagged by default",
+    name: "arrow: arithmetic body is not a boolean",
     source: "(val) => val + 1;",
     expect: {},
   },
   {
-    name: "arrow: arithmetic body flagged with extra",
-    source: "(val) => val + 1;",
-    extra: ["arrow" as CheckType],
-    expect: { arrow: 1 },
-  },
-  {
-    name: "arrow: block body not flagged by default",
+    name: "arrow: block body is never flagged",
     source: "(val) => { return val; };",
     expect: {},
   },
   {
-    name: "arrow: block body flagged with extra",
-    source: "(val) => { return val; };",
-    extra: ["arrow" as CheckType],
-    expect: { arrow: 1 },
-  },
-  {
-    name: "arrow: function expression not flagged by default",
+    name: "arrow: anonymous function expression is never flagged",
     source: "nums.map(function (item) { return item; });",
     expect: {},
-  },
-  {
-    name: "arrow: function expression flagged with extra",
-    source: "nums.map(function (item) { return item; });",
-    extra: ["arrow" as CheckType],
-    expect: { arrow: 1 },
   },
 ];
 
@@ -443,12 +439,8 @@ for (const testCase of CASES) {
     }
   }
 
-  let extra: CheckType[] = [];
-  if (testCase.extra !== undefined) {
-    extra = testCase.extra;
-  }
   Deno.test(testCase.name, () => {
-    assertEquals(countByType(testCase.source, extra), testCase.expect);
+    assertEquals(countByType(testCase.source), testCase.expect);
   });
 }
 
@@ -459,7 +451,6 @@ Deno.test("ternary: message recommends if/else outside JSX", () => {
   const inJsx = analyzeSource(
     "export function Badge(on: boolean) { return <b>{on === true ? 'y' : 'n'}</b>; }",
     "case.tsx",
-    { includeExtra: new Set() },
   );
   assertEquals(inJsx.length, 1);
   assertEquals(inJsx[0]!.context.includes("in JSX"), true);
@@ -468,7 +459,6 @@ Deno.test("ternary: message recommends if/else outside JSX", () => {
   const inCallback = analyzeSource(
     "export function Badge(on: boolean) { return <b>{render(() => (on === true ? 'y' : 'n'))}</b>; }",
     "case.tsx",
-    { includeExtra: new Set() },
   );
   assertEquals(inCallback.length, 1);
   assertEquals(

@@ -9,7 +9,7 @@ Every Deno route needs three flags. `--import-map` points at this repo's `deno.j
 **Install as a shim** (pinned, recommended). Deno fetches the import graph from the URL and caches it, so a pinned URL resolves only once per version:
 
 ```bash
-deno install -g --allow-read --allow-env --import-map https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta4/deno.json -n explicitjs https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta4/src/cli.ts
+deno install -g --allow-read --allow-env --import-map https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta5/deno.json -n explicitjs https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta5/src/cli.ts
 explicitjs <path>
 ```
 
@@ -17,7 +17,7 @@ explicitjs <path>
 
 ```bash
 # Pinned to a release tag — immutable, auditable at a fixed commit:
-alias explicitjs="deno run --allow-read --allow-env --import-map https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta4/deno.json https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta4/src/cli.ts"
+alias explicitjs="deno run --allow-read --allow-env --import-map https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta5/deno.json https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta5/src/cli.ts"
 
 # Or track the latest on main (mutable):
 alias explicitjs="deno run --allow-read --allow-env --import-map https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/main/deno.json https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/main/src/cli.ts"
@@ -31,11 +31,11 @@ Each release has an npm-installable tarball attached, named `explicitjs-<version
 
 ```bash
 # Bun — add as a dev dependency
-bun add -d https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta4/explicitjs-1beta4.tgz
+bun add -d https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta5/explicitjs-1beta5.tgz
 bunx explicitjs <path>
 
 # npm — global install
-npm install -g https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta4/explicitjs-1beta4.tgz
+npm install -g https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta5/explicitjs-1beta5.tgz
 explicitjs <path>
 ```
 

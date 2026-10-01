@@ -1,9 +1,8 @@
 /**
  * The fixture harness: each fixture's markers must match the analyzer exactly.
  *
- * `default_checks/test_*` and `extra_checks/test_*` are fixtures, not tests —
- * real source annotated with `// expect:` markers (grammar: test/README.md,
- * parser: fixtureSpec.ts). Each fixture runs once per declared mode; the
+ * `fixtures/test_*` are fixtures, not tests — real source annotated with
+ * `// expect:` markers (grammar: test/README.md, parser: fixtureSpec.ts). The
  * multiset of (line, checkType) findings must equal the markers, catching both
  * regressions (a check stops firing) and false positives (something new fires).
  *
@@ -58,17 +57,14 @@ for (const fixturePath of discoverFixtures()) {
   const fixtureName = path.basename(fixturePath);
   const spec = parseFixture(fixturePath);
 
-  for (const mode of spec.modes) {
-    Deno.test(`fixture: ${fixtureName} [${mode}]`, () => {
-      const expected = spec.expected.get(mode)!;
-      const actual = actualFor(spec, mode);
-      if (countersEqual(expected, actual) === false) {
-        throw new Error(
-          `\n${fixtureName} [${mode}] mismatch between markers and analyzer:\n${formatDiff(expected, actual)}`,
-        );
-      }
-    });
-  }
+  Deno.test(`fixture: ${fixtureName}`, () => {
+    const actual = actualFor(spec);
+    if (countersEqual(spec.expected, actual) === false) {
+      throw new Error(
+        `\n${fixtureName} mismatch between markers and analyzer:\n${formatDiff(spec.expected, actual)}`,
+      );
+    }
+  });
 
   Deno.test(`fixture syntax: ${fixtureName}`, () => {
     const cases = syntaxCasesFor(fixturePath);

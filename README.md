@@ -6,21 +6,19 @@ ExplicitJS flags code where the author's intent is ambiguous — patterns that f
 
 **Deno:** run straight from this repo, no build step, no registry
 ```bash
-deno install -g --allow-read --allow-env --import-map https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta4/deno.json -n explicitjs https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta4/src/cli.ts
+deno install -g --allow-read --allow-env --import-map https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta5/deno.json -n explicitjs https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta5/src/cli.ts
 ```
 
 **Bun/NPM:** prebuilt tarball attached to every GitHub Release
 ```bash
-bun add -d https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta4/explicitjs-1beta4.tgz
+bun add -d https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta5/explicitjs-1beta5.tgz
 ```
 
 Other routes (shell aliases, tracking `main`, running from a clone) see: [docs/install.md](docs/install.md).
 
 ## What it catches
 
-### Default checks
-
-Always on. Like [Black](https://github.com/psf/black), ExplicitJS is deliberately opinionated: these cannot be disabled or suppressed.
+Every check is always on. Like [Black](https://github.com/psf/black), ExplicitJS is deliberately opinionated: there are no options, no opt-ins, and no way to disable or suppress a check.
 
 | Check | What's ambiguous | What to write instead |
 |---|---|---|
@@ -29,6 +27,7 @@ Always on. Like [Black](https://github.com/psf/black), ExplicitJS is deliberatel
 | **Ternary expressions** | `cond ? x : y` — buries control flow | Explicit `if`/`else` block |
 | **Nullish coalescing** (`??`, `??=`) | `env.PORT ?? 3000` — an inline if in disguise | Explicit `=== null` / `=== undefined` check with `if`/`else` |
 | **Optional chaining** | `request?.headers?.token` — is a missing field expected or a bug? | Validate the shape once (schema/type), then access directly |
+| **Optional members** (`name?: T`) | `label?: string` on a parameter, property or method — is an absent value meaningful or an accident? | `label: string \| null`, plus `= null` where a default is legal |
 | **Boolean operators** | `a && b`, `a \|\| b`, `a \|\|= b`, `a &&= b` with non-boolean operands | Explicit comparisons for each operand |
 | **Bare attributes** (JSX, Svelte/Vue templates) | `<Widget active />` — `true` only by convention | `<Widget active={true} />` / `:active="true"` |
 | **Implicit booleans in arrow / function expressions** | Truthiness hidden in anonymous logic | Named function with explicit comparisons |
@@ -38,17 +37,9 @@ Always on. Like [Black](https://github.com/psf/black), ExplicitJS is deliberatel
 | **Single-use variables** | `const r = compute(); return r;` — pointless indirection | Inline the expression |
 | **Single-use functions** | Helper called exactly once | Inline at the call site |
 
-### Extended checks
+Optional chaining and optional members are two halves of one rule. `response?.data?.messages?.text` is only reasonable because something upstream declared those fields optional, so the optional-member check closes the hole: a type that says `data: Data | null` forces the reader — and the next caller — to handle the absent case explicitly instead of chaining past it.
 
-Off by default; opt in with `--include-extra` or `include-extra` in `.explicitrc.json`.
-These ban a construct outright, not just ambiguous uses (see `explicitjs list-extras`).
-
-| Check | Why ban it | What to write instead |
-|---|---|---|
-| **`arrow`** — all arrow / function expressions | Anonymous logic with no name to describe intent | Named function |
-| **`optional_param`** — all `arg?: T` parameters | Is an absent value meaningful or an accident? | `arg: T \| null = null` — names the absent value, documents the default |
-
-`optional_param` applies to function implementations only; interfaces and overload declarations cannot carry defaults and are exempt.
+Optional members are flagged wherever `?` appears on a parameter, property or method: implementations, interfaces, type literals, classes and overload signatures alike. Where a default is legal (a parameter of an implementation, a concrete class field) the advice adds `= null`, so existing callers keep working; where it is not, the type carries the `| null` and every construction site states the field. Optional tuple elements (`[name: string, label?: string]`) are out of scope.
 
 ## Usage
 
@@ -63,15 +54,11 @@ explicitjs . --format json
 # Statistics only
 explicitjs . --stats-only
 
-# Strict mode: ban all anonymous functions and optional parameters
-explicitjs . --include-extra arrow --include-extra optional_param
-
-# Describe every default check / every opt-in extra
+# Describe every check
 explicitjs list-checks
-explicitjs list-extras
 ```
 
-`<path>` is any file or directory. ExplicitJS analyzes `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.mts`, `.cts`, plus `.svelte` and `.vue` components (their `<script>` blocks as code, their template markup for bare attributes), and skips `node_modules`, `dist`, `build`, dotfile directories, and `*.d.ts`. Files are parsed with the TypeScript compiler, so no `tsconfig` is needed.
+`<path>` is any file or directory. ExplicitJS analyzes `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.mts`, `.cts`, plus `.svelte` and `.vue` components (their `<script>` blocks as code, their template markup for bare attributes), and skips `node_modules`, `dist`, `build`, dotfile directories, and `*.d.ts` (add more with `ignore` in [the config file](#configuration)). Files are parsed with the TypeScript compiler, so no `tsconfig` is needed.
 
 ### Exit codes
 
@@ -83,39 +70,24 @@ Every outcome maps to exactly one code, so CI pipelines can tell them apart:
 | `1` | The analysis found style violations |
 | `20` | CLI args were invalid: bad flag, missing path, no source files to check |
 
-### Suppressing a check inline
-
-The opt-in `--include-extra` checks can be suppressed per line with a trailing `allow-X` directive naming the check:
-
-```ts
-items.forEach((item) => render(item)); // explicit: allow-arrow
-function greet(name?: string) {}       // explicit: allow-optional_param
-```
-
-The rules are deliberately strict:
-
-- **The default checks are always mandatory.** `// explicit: allow-if` does nothing; a construct the default mode flags cannot be silenced.
-- The directive lifts only the opt-in ban. An arrow with an implicit-boolean body still gets flagged by the default variant even under `// explicit: allow-arrow`.
-- Every item needs the `allow-` prefix; `// explicit: arrow` suppresses nothing. Naming exactly what you are allowing is itself an explicitness requirement.
-- Unknown names are ignored; multiple items are comma-separated (`// explicit: allow-arrow, allow-optional_param`).
-
 ## Configuration
 
-ExplicitJS reads defaults from a `.explicitrc.json` file — discovered by walking up from the analyzed path, or pointed at explicitly with `--config`. **Command-line flags always override the config file**; `include-extra` is merged with its CLI counterpart.
+ExplicitJS reads an optional `.explicitrc.json` — discovered by walking up from the analyzed path, or pointed at explicitly with `--config`. It has exactly two keys, because the file holds what the _project_ knows: how it reports, and what it does not scan.
 
 ```jsonc
 // .explicitrc.json
 {
   "format": "text", // text | json | csv
-  "include-extra": ["arrow"], // opt into stricter checks
-  "no-color": false,
-  "stats-only": false,
+  "ignore": ["generated", "src/vendored"],
 }
 ```
 
-Configuration only ever adds checks, never removes them:
+- **`format`** — the default output format. `--format` overrides it.
+- **`ignore`** — directories to skip **on top of** the built-in list (`node_modules`, `dist`, `build`, `out`, `coverage`, `vendor`, dotfile directories, …), which no config can re-enable. A bare name skips that directory at any depth; an entry containing a separator is a path relative to the config file, so it means the same directory wherever you invoke the tool from. Directories only — no file patterns, no globs.
 
-- **`include-extra`** opts into a check that is off by default. `arrow` has a default variant that only flags _ambiguous_ (implicit-boolean) bodies; listing it here flags **every** arrow / function expression. `optional_param` has no default variant — listing it flags every `arg?: T` in a function implementation.
+Everything else is a command-line flag: `--stats-only` and `--no-color` are choices about one run, not facts about the project, and putting them in the file does nothing.
+
+There is no key for turning a check on or off, and no inline directive either — `// explicit: allow-if` does nothing. A construct ExplicitJS flags cannot be silenced; the tool has one mode.
 
 See [explicit.example.json](explicit.example.json) for every setting and its default.
 

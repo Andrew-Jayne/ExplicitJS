@@ -66,21 +66,15 @@ interface ScopeContext {
   filename: string;
   sourceFile: ts.SourceFile;
   results: StyleCheck[];
-  entryPoints: ReadonlySet<string>;
   exportedNames: ReadonlySet<string>;
   scopes: Scope[];
 }
 
-export function findSingleUse(
-  sourceFile: ts.SourceFile,
-  filename: string,
-  entryPoints: ReadonlySet<string> = new Set(),
-): StyleCheck[] {
+export function findSingleUse(sourceFile: ts.SourceFile, filename: string): StyleCheck[] {
   const ctx: ScopeContext = {
     filename,
     sourceFile,
     results: [],
-    entryPoints,
     exportedNames: collectExportedNames(sourceFile),
     scopes: [],
   };
@@ -522,7 +516,7 @@ function flagScope(scope: Scope, ctx: ScopeContext): void {
     if (isDunder(name) === true) {
       continue;
     }
-    if (ctx.entryPoints.has(name) === true || ctx.exportedNames.has(name) === true) {
+    if (ctx.exportedNames.has(name) === true) {
       continue;
     }
     // A reference read — `memo(Component)`, `items.map(helper)`, a JSX tag —

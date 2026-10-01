@@ -1,27 +1,21 @@
 /**
- * Project configuration discovery. Settings come from a `.explicitrc.json` file, discovered by walking up from the analyzed path (or pointed at explicitly with `--config`). Every flag-backed field defaults to `undefined` ("not specified") so the CLI layer can tell an explicit choice from a fallback.
+ * Project configuration discovery. Settings come from a `.explicitrc.json` file, discovered by walking up from the analyzed path (or pointed at explicitly with `--config`). The file holds what the project knows — how it reports and what it does not scan — so there are exactly two keys: `format` and `ignore`. Per-run choices (`--stats-only`, `--no-color`) are flags only, and no key can turn a check on or off. `format` defaults to `null` ("not specified") so the CLI layer can tell an explicit choice from a fallback.
  */
 
 import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
-import {
-  type CheckType,
-  EXTRA_CHECKS,
-  isCheckType,
-  isReportFormat,
-  type ReportFormat,
-} from "./constructs.ts";
+import { isReportFormat, type ReportFormat } from "./constructs.ts";
 
 export interface Config {
-  format?: ReportFormat;
-  includeExtra?: string[];
-  noColor?: boolean;
-  statsOnly?: boolean;
-  entryPoints: Set<string>;
+  format: ReportFormat | null;
+  /** Bare directory names from `ignore`, skipped at any depth. */
+  ignoreNames: Set<string>;
+  /** Entries from `ignore` that carry a separator, resolved against the config file. */
+  ignorePaths: Set<string>;
 }
 
 function emptyConfig(): Config {
-  return { entryPoints: new Set() };
+  return { format: null, ignoreNames: new Set(), ignorePaths: new Set() };
 }
 
 function directoryOf(start: string): string {
@@ -62,49 +56,53 @@ export function loadConfig(start: string, configPath: string | null = null): Con
   return config;
 }
 
-function readJson(filepath: string): Record<string, unknown> | undefined {
+function readJson(filepath: string): Record<string, unknown> | null {
   try {
     const parsed: unknown = JSON.parse(readFileSync(filepath, "utf-8"));
     if (typeof parsed === "object" && parsed !== null) {
       return parsed as Record<string, unknown>;
     }
   } catch {
-    return undefined;
+    return null;
   }
-  return undefined;
+  return null;
 }
 
 function applyRcFile(filepath: string, config: Config): void {
   const data = readJson(filepath);
-  if (data === undefined) {
+  if (data === null) {
     return;
   }
-  applyTable(data, config);
+  applyTable(data, config, path.dirname(path.resolve(filepath)));
 }
 
-function isEnabledExtra(value: string): boolean {
-  return isCheckType(value) === true && EXTRA_CHECKS.has(value as CheckType) === true;
-}
-
-function applyTable(table: Record<string, unknown>, config: Config): void {
+/**
+ * Apply one config table. `baseDir` is the directory holding the config file:
+ * an `ignore` entry with a separator in it is a path relative to that file, so
+ * it means the same directory wherever the tool is invoked from. Unknown keys
+ * are ignored, which includes the output flags (`--stats-only`, `--no-color`)
+ * and anything that looks like a check name.
+ */
+function applyTable(table: Record<string, unknown>, config: Config, baseDir: string): void {
   const format = lookupString(table, "format");
-  if (format !== undefined && isReportFormat(format) === true) {
+  if (format !== null && isReportFormat(format) === true) {
     config.format = format;
   }
 
-  const includeExtra = lookupArray(table, "include-extra", "includeExtra");
-  if (includeExtra !== undefined) {
-    config.includeExtra = includeExtra.filter(isEnabledExtra);
+  const ignore = lookupArray(table, "ignore");
+  if (ignore === null) {
+    return;
   }
-
-  const noColor = lookupBool(table, "no-color", "noColor");
-  if (noColor !== undefined) {
-    config.noColor = noColor;
-  }
-
-  const statsOnly = lookupBool(table, "stats-only", "statsOnly");
-  if (statsOnly !== undefined) {
-    config.statsOnly = statsOnly;
+  for (const entry of ignore) {
+    const trimmed = entry.trim();
+    if (trimmed === "") {
+      continue;
+    }
+    if (trimmed.includes("/") === true || trimmed.includes("\\") === true) {
+      config.ignorePaths.add(path.resolve(baseDir, trimmed));
+    } else {
+      config.ignoreNames.add(trimmed);
+    }
   }
 }
 
@@ -114,29 +112,27 @@ function lookup(table: Record<string, unknown>, ...keys: string[]): unknown {
       return table[key];
     }
   }
-  return undefined;
+  return null;
 }
 
-function lookupString(table: Record<string, unknown>, ...keys: string[]): string | undefined {
+function lookupString(table: Record<string, unknown>, ...keys: string[]): string | null {
   const value = lookup(table, ...keys);
   if (typeof value === "string") {
     return value;
   }
-  return undefined;
+  return null;
 }
 
-function lookupBool(table: Record<string, unknown>, ...keys: string[]): boolean | undefined {
+function lookupArray(table: Record<string, unknown>, ...keys: string[]): string[] | null {
   const value = lookup(table, ...keys);
-  if (typeof value === "boolean") {
-    return value;
+  if (Array.isArray(value) === false) {
+    return null;
   }
-  return undefined;
-}
-
-function lookupArray(table: Record<string, unknown>, ...keys: string[]): string[] | undefined {
-  const value = lookup(table, ...keys);
-  if (Array.isArray(value) === true) {
-    return value.filter((item): item is string => typeof item === "string");
+  const items: string[] = [];
+  for (const item of value as unknown[]) {
+    if (typeof item === "string") {
+      items.push(item);
+    }
   }
-  return undefined;
+  return items;
 }

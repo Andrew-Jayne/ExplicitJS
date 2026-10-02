@@ -23,21 +23,21 @@ Every check is always on. Like [Black](https://github.com/psf/black), ExplicitJS
 | Check | What's ambiguous | What to write instead |
 |---|---|---|
 | **Implicit booleans** in `if` / `while` / `do…while` / `for (…; cond; …)` | `if (items)` — checking length? nullness? | `if (items.length > 0)` or `if (items !== null)` |
-| **`assert` truthiness** (`assert(x)`, `console.assert(x)`, `assert.ok(x)`, `assert.strict(x)` — including import aliases like `import { ok } from "node:assert"`) | Relies on coercion | `assert(x !== undefined)` |
+| **`assert` truthiness** (`assert(x)`, `console.assert(x)`, `assert.ok(x)`, `assert.strict(x)` — including import aliases like `import { ok } from "node:assert"` — and test runners' `expect(x).toBeTruthy()` / `.toBeFalsy()`) | Relies on coercion | `assert(x !== undefined)`, `expect(x).not.toBeNull()` |
 | **Ternary expressions** | `cond ? x : y` — buries control flow | Explicit `if`/`else` block |
-| **Nullish coalescing** (`??`, `??=`) | `env.PORT ?? 3000` — an inline if in disguise | Explicit `=== null` / `=== undefined` check with `if`/`else` |
+| **Nullish coalescing** (`??`, `??=`, and default values) | `env.PORT ?? 3000` — an inline if in disguise; so are `const { PORT = 3000 } = env` and `function listen(port = 3000)`, which fill in only on `undefined` | Explicit `=== null` / `=== undefined` check with `if`/`else`. The one allowed default is a parameter's `= null` |
 | **Optional chaining** | `request?.headers?.token` — is a missing field expected or a bug? | Validate the shape once (schema/type), then access directly |
-| **Non-null assertions** | `request!.headers!.token` — presence claimed, never checked | Validate the shape, or test `=== null` / `=== undefined` explicitly. `items[0]!` index access is exempt (the `noUncheckedIndexedAccess` idiom) |
-| **Optional members** (`name?: T`) | `label?: string` on a parameter, property or method — is an absent value meaningful or an accident? | `label: string \| null`, plus `= null` where a default is legal |
+| **Non-null assertions** | `request!.headers!.token` — presence claimed, never checked | Validate the shape, or test `=== null` / `=== undefined` explicitly. `items[0]!` index access is exempt (the `noUncheckedIndexedAccess` idiom). Definite assignment (`token!: string`, `let config!: Config`) is the same claim and is flagged too |
+| **Optional members** (`name?: T`) | `label?: string` on a parameter, property or method — or JSDoc's `@param {string} [label]` / `@property {string} [label]` — is an absent value meaningful or an accident? | `label: string \| null`, plus `= null` where a default is legal |
 | **Boolean operators** | `a && b`, `a \|\| b`, `a \|\|= b`, `a &&= b` with non-boolean operands | Explicit comparisons for each operand |
 | **Negation** outside a condition | `const missing = !items`, `return !value`, `if (!items === true)` — the same coercion as `if (items)`, moved somewhere the condition check can't see it | `items === null`, `value.length === 0`, `ready === false` |
 | **Bare attributes** (JSX, Svelte/Vue templates) | `<Widget active />` — `true` only by convention | `<Widget active={true} />` / `:active="true"` |
 | **Implicit booleans in arrow / function expressions** | Truthiness hidden in anonymous logic | Named function with explicit comparisons |
 | **Truthiness predicates** | `.filter(Boolean)`, `.some(String)`, `.every(Number)`, `.find((user) => user.email)` — truthiness as the predicate of `filter` / `find*` / `some` / `every` | Explicit predicate, e.g. `.filter((value) => value !== undefined)` |
 | **Loose equality** (`==`, `!=`) | Coerces operands silently | `===` / `!==` |
-| **Single-letter names** | `x`, `n`, `e` — including destructured (`const { x } = point`, `[k, v]`), imported (`import { join as j }`) and read-back `_` names | Descriptive names |
+| **Single-letter names** | `x`, `n`, `e` — anywhere, for any reason: variables, parameters, destructured and imported names, functions, classes, methods, properties and object keys, types, interfaces, enums and their members, generic parameters (`<T>`), labels, export aliases, and a read-back `_` | Descriptive names (`<Item>`, not `<T>`) |
 | **Single-use variables** | `const r = compute(); return r;` — pointless indirection | Inline the expression |
-| **Single-use functions** | Helper called exactly once — from anywhere, including a module-level helper whose one call sits inside another function | Inline the operations at the call site |
+| **Single-use functions** | Helper called exactly once — from anywhere, including a module-level helper whose one call sits inside another function, and a `private` / `#private` method called once within its class | Inline the operations at the call site |
 
 Optional chaining and optional members are two halves of one rule. `response?.data?.messages?.text` is only reasonable because something upstream declared those fields optional, so the optional-member check closes the hole: a type that says `data: Data | null` forces the reader — and the next caller — to handle the absent case explicitly instead of chaining past it.
 
@@ -97,7 +97,8 @@ See [example.explicitrc.json](example.explicitrc.json) for every setting and its
 
 The single-use checks deliberately ignore a few legitimate patterns:
 
-- **Constants** — `UPPER_SNAKE_CASE` names are never flagged as single-use variables; a named constant documents intent even when used once.
+- **Constants** — `UPPER_SNAKE_CASE` names bound to a constant value are never flagged as single-use variables; a named constant documents intent even when used once. A constant value is a literal, or an array, object, template, operator expression, `new Set/Map/RegExp(...)` or member access built only from literals and other constants — `const USER = await fetchUser()` is a runtime value in capitals and gets no exemption.
+- **Public methods** — a class's public and `protected` methods can be called from other files, which a single-file analysis cannot see, so only `private` / `#private` methods are checked for single use.
 - **Exports** — exported names are never flagged as single-use, since references from outside the file are invisible to a single-file analysis.
 - **Entry points** — functions named `main` are never flagged as single-use functions.
 - **Function references** — a function whose only use passes it **by name** (`React.memo(Component)`, `items.map(helper)`, `onClick={handler}`, a `<Component />` tag) is never flagged as single-use. A named reference is exactly the explicit style this tool asks for; only a genuine call counts as an inlinable use — and `helper.call(…)`, `helper.apply(…)`, `(helper)(…)`, ``helper`…` `` and `new Helper()` are all genuine calls. Ambient `declare function` signatures are exempt for the same reason.

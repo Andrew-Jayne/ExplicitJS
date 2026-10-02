@@ -23,3 +23,10 @@ globalThis.console.assert(value); // expect: assert
 assert.strict(value); // expect: assert
 assert.strict.ok(value); // expect: assert
 assert.equal(value, true);
+
+// Test-runner truthiness matchers are assert(x) by another name.
+expect(user).toBeTruthy(); // expect: assert
+expect(user).not.toBeFalsy(); // expect: assert
+await expect(loadUser()).resolves.toBeTruthy(); // expect: assert
+expect(user).toBe(true);
+expect(user).not.toBeNull();

@@ -60,14 +60,14 @@ export const CHECK_DESCRIPTIONS: Readonly<Record<CheckType, string>> = {
   [CheckType.WHILE]:
     "Implicit truthiness in a while/do-while/for condition - write an explicit comparison",
   [CheckType.ASSERT]:
-    "Implicit truthiness in assert/console.assert/assert.ok/assert.strict (however imported or spelled) - assert an explicit comparison",
+    "Implicit truthiness in assert/console.assert/assert.ok/assert.strict (however imported or spelled) or expect(...).toBeTruthy()/.toBeFalsy() - assert an explicit comparison",
   [CheckType.TERNARY]: "Inline conditional 'cond ? x : y' - use an explicit if/else block",
   [CheckType.NULLISH_COALESCE]:
-    "'??' / '??=' inline null-defaulting - test === null / === undefined explicitly",
+    "'??' / '??=' inline null-defaulting, and default values that do the same ('const { port = 3000 } = env', 'function listen(port = 3000)') - test === null / === undefined explicitly; a parameter's '= null' is the one allowed default",
   [CheckType.OPTIONAL_CHAIN]:
     "Optional chaining 'a?.b' hides missing fields - validate the shape once, then access directly",
   [CheckType.NON_NULL]:
-    "Non-null assertion 'a!.b' claims presence instead of checking it - validate the shape or test explicitly ('items[0]!' index access is exempt)",
+    "Non-null assertion 'a!.b' or definite assignment 'token!: T' claims presence instead of checking it - validate the shape or test explicitly ('items[0]!' index access is exempt)",
   [CheckType.BOOL_OP]:
     "'&&' / '||' (and '&&=' / '||=') with a non-boolean operand - write an explicit comparison for each operand",
   [CheckType.NOT]:
@@ -80,13 +80,13 @@ export const CHECK_DESCRIPTIONS: Readonly<Record<CheckType, string>> = {
     "Truthiness predicate in .filter/.find/.some/.every ('Boolean', 'String', 'Number', or a callback returning a bare value) - pass an explicit predicate",
   [CheckType.LOOSE_EQUALITY]: "Loose '==' / '!=' coerces operands - use '===' / '!=='",
   [CheckType.SINGLE_LETTER_VAR]:
-    "Single-letter name carries no semantic meaning - use a descriptive name",
+    "Single-letter name anywhere (variables, parameters, properties, object keys, types, generic parameters, enum members, labels, ...) carries no semantic meaning - use a descriptive name",
   [CheckType.SINGLE_USE_VAR]:
-    "Variable assigned then read exactly once - inline the expression (UPPER_SNAKE_CASE constants are exempt)",
+    "Variable assigned then read exactly once - inline the expression (UPPER_SNAKE_CASE names bound to constant values are exempt)",
   [CheckType.SINGLE_USE_FUNC]:
-    "Function called exactly once - inline it at the call site (exports and 'main' are exempt)",
+    "Function, or private class method, called exactly once - inline it at the call site (exports and 'main' are exempt)",
   [CheckType.OPTIONAL_PARAM]:
-    "Optional 'name?: T' parameter, property or method, or optional-everything via Partial<T> / a '?:' mapped type - write 'name: T | null' (plus '= null' where a default is legal) so the absent value is named and callers must handle it",
+    "Optional 'name?: T' parameter, property or method (or JSDoc '[name]'), or optional-everything via Partial<T> / a '?:' mapped type - write 'name: T | null' (plus '= null' where a default is legal) so the absent value is named and callers must handle it",
 };
 
 export interface StyleCheck {

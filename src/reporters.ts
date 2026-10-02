@@ -68,10 +68,7 @@ function padEnd(value: string, width: number): string {
   return value + " ".repeat(width - value.length);
 }
 
-export function formatReport(
-  checks: StyleCheck[],
-  formatType: ReportFormat = ReportFormat.TEXT,
-): string {
+export function formatReport(checks: StyleCheck[], formatType: ReportFormat): string {
   switch (formatType) {
     case ReportFormat.JSON:
       return JSON.stringify(

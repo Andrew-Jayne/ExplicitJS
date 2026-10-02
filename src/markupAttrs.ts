@@ -144,7 +144,104 @@ class MarkupScanner {
     while (this.index < this.source.length) {
       const current = this.source[this.index]!;
       if (current === "{") {
-        this.scanTextExpression();
+        // Svelte text may hold `{expr}` and `{#block}` tags (where a `<` is
+        // not a tag); Vue text expressions are `{{ expr }}`, and a lone `{` is
+        // plain text there - brace matching it would swallow the rest of the
+        // template.
+        const open = this.index;
+        if (this.flavor === "svelte") {
+          this.skipBraced();
+          // One Svelte `{...}` tag, `blockStart`/`blockEnd` bounding the text
+          // inside the braces.
+          const blockStart = open + 1;
+          const blockEnd = this.index - 1;
+          const body = this.source.slice(blockStart, blockEnd);
+          const trimmed = body.trimStart();
+          const offset = blockStart + body.length - trimmed.length;
+
+          if (trimmed.startsWith("#each") === true) {
+            // `{#each items as item, index (item.id)}` - and Svelte 5's
+            // `{#each items, index}` with no binding. The binding and index
+            // together are one parameter list; the key is an expression.
+            const eachStart = offset + 5;
+            const eachText = this.source.slice(eachStart, blockEnd);
+            const asAt = findTopLevel(eachText, " as ", 0);
+            if (asAt === -1) {
+              const commaAt = findTopLevel(eachText, ",", 0);
+              if (commaAt === -1) {
+                this.addSpan("expression", eachStart, blockEnd, "{#each %}");
+              } else {
+                this.addSpan("expression", eachStart, eachStart + commaAt, "{#each %}");
+                this.addSpan("params", eachStart + commaAt + 1, blockEnd, "{#each %}");
+              }
+            } else {
+              this.addSpan("expression", eachStart, eachStart + asAt, "{#each %}");
+              const bindingStart = asAt + 4;
+              const keyAt = findTopLevel(eachText, "(", bindingStart);
+              if (keyAt === -1) {
+                this.addSpan("params", eachStart + bindingStart, blockEnd, "{#each %}");
+              } else {
+                this.addSpan("params", eachStart + bindingStart, eachStart + keyAt, "{#each %}");
+                this.addSpan(
+                  "expression",
+                  eachStart + keyAt + 1,
+                  eachStart + eachText.lastIndexOf(")"),
+                  "{#each %}",
+                );
+              }
+            }
+          } else if (trimmed.startsWith("#await") === true) {
+            const awaitStart = offset + 6;
+            const awaited = this.source.slice(awaitStart, blockEnd);
+            let splitAt = findTopLevel(awaited, " then", 0);
+            let keyword = " then";
+            if (splitAt === -1) {
+              splitAt = findTopLevel(awaited, " catch", 0);
+              keyword = " catch";
+            }
+            if (splitAt === -1) {
+              this.addSpan("expression", awaitStart, blockEnd, "{#await %}");
+            } else {
+              this.addSpan("expression", awaitStart, awaitStart + splitAt, "{#await %}");
+              this.addSpan("params", awaitStart + splitAt + keyword.length, blockEnd, "{#await %}");
+            }
+          } else if (trimmed.startsWith("#snippet") === true) {
+            // `{#snippet row(item, index)}` - the parameters are the code.
+            const paramsOpen = this.source.indexOf("(", offset);
+            const paramsClose = this.source.lastIndexOf(")", blockEnd);
+            if (paramsOpen !== -1 && paramsOpen < blockEnd && paramsClose > paramsOpen) {
+              this.addSpan("params", paramsOpen + 1, paramsClose, "{#snippet %}");
+            }
+          } else {
+            let handled = false;
+            for (const block of SVELTE_BLOCKS) {
+              if (trimmed.startsWith(block.prefix) === true) {
+                this.addSpan(
+                  block.role,
+                  offset + block.prefix.length,
+                  blockEnd,
+                  `{${block.prefix} %}`,
+                );
+                handled = true;
+                break;
+              }
+            }
+            // Block markers with no code of their own: `{/if}`, `{:else}`, ...
+            for (const marker of ["#", "@", ":", "/"]) {
+              if (handled === false && trimmed.startsWith(marker) === true) {
+                handled = true;
+              }
+            }
+            if (handled === false) {
+              this.addSpan("expression", blockStart, blockEnd, "{%}");
+            }
+          }
+        } else if (this.source.startsWith("{{", this.index) === true) {
+          this.skipPast("}}");
+          this.addSpan("expression", open + 2, this.index - 2, "{{ % }}");
+        } else {
+          this.index += 1;
+        }
         continue;
       }
       if (current !== "<") {
@@ -164,263 +261,178 @@ class MarkupScanner {
         continue;
       }
       if (TAG_NAME_START.test(following) === true) {
-        this.scanTag();
+        const tagNameStart = this.index + 1;
+        let tagNameEnd = tagNameStart;
+        while (
+          tagNameEnd < this.source.length &&
+          NAME_END_CHARS.has(this.source[tagNameEnd]!) === false
+        ) {
+          tagNameEnd += 1;
+        }
+        const tagName = this.source.slice(tagNameStart, tagNameEnd).toLowerCase();
+        this.index = tagNameEnd;
+
+        // Consume attributes through the tag's closing `>`, flagging bare ones.
+        while (this.index < this.source.length) {
+          this.skipWhitespace();
+          const attrChar = this.source[this.index];
+          if (attrChar === undefined) {
+            break;
+          }
+          if (attrChar === ">") {
+            this.index += 1;
+            break;
+          }
+          if (attrChar === "/") {
+            this.index += 1;
+            continue;
+          }
+          if (attrChar === "{") {
+            // Svelte's `{value}` / `{...rest}` shorthands name their value.
+            let shorthandStart = this.index + 1;
+            if (this.source.startsWith("...", shorthandStart) === true) {
+              shorthandStart += 3;
+            }
+            this.skipBraced();
+            this.addSpan("expression", shorthandStart, this.index - 1, "{%}");
+            continue;
+          }
+          if (attrChar === "<") {
+            // Malformed markup: bail rather than swallow the next tag.
+            break;
+          }
+          const attrNameStart = this.index;
+          while (
+            this.index < this.source.length &&
+            NAME_END_CHARS.has(this.source[this.index]!) === false
+          ) {
+            this.index += 1;
+          }
+          const attrName = this.source.slice(attrNameStart, this.index);
+          if (attrName.length === 0) {
+            this.index += 1;
+            continue;
+          }
+          this.skipWhitespace();
+          if (this.source[this.index] === "=") {
+            this.index += 1;
+            this.skipWhitespace();
+            if (RAW_TEXT_TAGS.has(tagName) === true) {
+              this.skipAttrValue();
+              continue;
+            }
+            // Skip one attribute value, collecting the code it carries.
+            const valueStart = this.index;
+            this.skipAttrValue();
+            const opener = this.source[valueStart];
+            if (opener === undefined) {
+              continue;
+            }
+            if (this.flavor === "svelte") {
+              if (opener === "{") {
+                let role: TemplateRole = "expression";
+                if (attrName.startsWith("let:") === true) {
+                  role = "params";
+                }
+                this.addSpan(role, valueStart + 1, this.index - 1, `${attrName}={%}`);
+              } else if (QUOTE_CHARS.has(opener) === true) {
+                // `class="card {size}"` - every `{...}` inside a quoted value is code.
+                let cursor = valueStart + 1;
+                while (cursor < this.index - 1) {
+                  if (this.source[cursor] !== "{") {
+                    cursor += 1;
+                    continue;
+                  }
+                  const close = findTopLevel(this.source, "}", cursor + 1);
+                  if (close === -1) {
+                    break;
+                  }
+                  this.addSpan("expression", cursor + 1, close, `${attrName}="{%}"`);
+                  cursor = close + 1;
+                }
+              }
+              continue;
+            }
+
+            let valueCodeStart = valueStart;
+            let valueCodeEnd = this.index;
+            if (QUOTE_CHARS.has(opener) === true) {
+              valueCodeStart += 1;
+              valueCodeEnd -= 1;
+            }
+            const label = `${attrName}="%"`;
+            if (VUE_CONDITIONS.has(attrName) === true) {
+              this.addSpan("condition", valueCodeStart, valueCodeEnd, label);
+            } else if (attrName === "v-for") {
+              // `v-for="(item, index) in items"`: the alias is a parameter
+              // list, the source an expression.
+              const forText = this.source.slice(valueCodeStart, valueCodeEnd);
+              let splitAt = findTopLevel(forText, " in ", 0);
+              if (splitAt === -1) {
+                splitAt = findTopLevel(forText, " of ", 0);
+              }
+              if (splitAt !== -1) {
+                let aliasStart = valueCodeStart;
+                let aliasEnd = valueCodeStart + splitAt;
+                const alias = forText.slice(0, splitAt).trim();
+                if (alias.startsWith("(") === true && alias.endsWith(")") === true) {
+                  aliasStart = valueCodeStart + forText.indexOf("(") + 1;
+                  aliasEnd = valueCodeStart + forText.slice(0, splitAt).lastIndexOf(")");
+                }
+                this.addSpan("params", aliasStart, aliasEnd, label);
+                this.addSpan("expression", valueCodeStart + splitAt + 4, valueCodeEnd, label);
+              }
+            } else if (
+              attrName.startsWith("v-slot") === true ||
+              attrName.startsWith("#") === true
+            ) {
+              this.addSpan("params", valueCodeStart, valueCodeEnd, label);
+            } else if (attrName.startsWith("@") === true || attrName.startsWith("v-on") === true) {
+              this.addSpan("handler", valueCodeStart, valueCodeEnd, label);
+            } else if (
+              attrName.startsWith(":") === true ||
+              attrName.startsWith(".") === true ||
+              attrName.startsWith("v-") === true
+            ) {
+              this.addSpan("expression", valueCodeStart, valueCodeEnd, label);
+            }
+            continue;
+          }
+          // Directives (bind:/on:/class:/let:, v-slot:, xmlns:) are valueless
+          // by design; script/style tags carry mode markers with no explicit
+          // form.
+          let isExempt = attrName.includes(":") === true || RAW_TEXT_TAGS.has(tagName) === true;
+          if (isExempt === false && this.flavor === "vue") {
+            isExempt =
+              attrName.startsWith("v-") === true ||
+              attrName.startsWith("@") === true ||
+              attrName.startsWith("#") === true;
+          }
+          if (isExempt === false) {
+            let attrContext = `Bare template attribute relies on the implicit-true convention - write ${attrName}={true}`;
+            if (this.flavor === "vue") {
+              attrContext = `Bare template attribute relies on the implicit-true convention - write :${attrName}="true"`;
+            }
+            const before = this.source.slice(0, attrNameStart);
+            this.results.push({
+              file: this.filename,
+              line: before.split("\n").length,
+              column: attrNameStart - before.lastIndexOf("\n") - 1,
+              code: attrName,
+              context: attrContext,
+              checkType: CheckType.BOOL_ATTR,
+            });
+          }
+        }
+
+        if (RAW_TEXT_TAGS.has(tagName) === true) {
+          this.skipPast(`</${tagName}`);
+          this.skipPast(">");
+        }
         continue;
       }
       this.index += 1;
     }
-  }
-
-  // Svelte text may hold `{expr}` and `{#block}` tags (where a `<` is not a
-  // tag); Vue text expressions are `{{ expr }}`, and a lone `{` is plain text
-  // there - brace matching it would swallow the rest of the template.
-  private scanTextExpression(): void {
-    const open = this.index;
-    if (this.flavor === "svelte") {
-      this.skipBraced();
-      this.addSvelteBlock(open + 1, this.index - 1);
-      return;
-    }
-    if (this.source.startsWith("{{", this.index) === true) {
-      this.skipPast("}}");
-      this.addSpan("expression", open + 2, this.index - 2, "{{ % }}");
-      return;
-    }
-    this.index += 1;
-  }
-
-  private scanTag(): void {
-    const nameStart = this.index + 1;
-    let nameEnd = nameStart;
-    while (nameEnd < this.source.length && NAME_END_CHARS.has(this.source[nameEnd]!) === false) {
-      nameEnd += 1;
-    }
-    const tagName = this.source.slice(nameStart, nameEnd).toLowerCase();
-    this.index = nameEnd;
-    this.scanAttributes(tagName);
-    if (RAW_TEXT_TAGS.has(tagName) === true) {
-      this.skipPast(`</${tagName}`);
-      this.skipPast(">");
-    }
-  }
-
-  /** Consumes attributes through the tag's closing `>`, flagging bare ones. */
-  private scanAttributes(tagName: string): void {
-    while (this.index < this.source.length) {
-      this.skipWhitespace();
-      const current = this.source[this.index];
-      if (current === undefined) {
-        return;
-      }
-      if (current === ">") {
-        this.index += 1;
-        return;
-      }
-      if (current === "/") {
-        this.index += 1;
-        continue;
-      }
-      if (current === "{") {
-        // Svelte's `{value}` / `{...rest}` shorthands name their value.
-        let start = this.index + 1;
-        if (this.source.startsWith("...", start) === true) {
-          start += 3;
-        }
-        this.skipBraced();
-        this.addSpan("expression", start, this.index - 1, "{%}");
-        continue;
-      }
-      if (current === "<") {
-        // Malformed markup: bail rather than swallow the next tag.
-        return;
-      }
-      const nameStart = this.index;
-      while (
-        this.index < this.source.length &&
-        NAME_END_CHARS.has(this.source[this.index]!) === false
-      ) {
-        this.index += 1;
-      }
-      const name = this.source.slice(nameStart, this.index);
-      if (name.length === 0) {
-        this.index += 1;
-        continue;
-      }
-      this.skipWhitespace();
-      if (this.source[this.index] === "=") {
-        this.index += 1;
-        this.skipWhitespace();
-        if (RAW_TEXT_TAGS.has(tagName) === true) {
-          this.skipAttrValue();
-        } else {
-          this.scanAttrValue(name);
-        }
-        continue;
-      }
-      if (this.isExemptName(name, tagName) === false) {
-        this.record(name, nameStart);
-      }
-    }
-  }
-
-  /** Skips one attribute value, collecting the code it carries. */
-  private scanAttrValue(name: string): void {
-    const valueStart = this.index;
-    this.skipAttrValue();
-    const opener = this.source[valueStart];
-    if (opener === undefined) {
-      return;
-    }
-    if (this.flavor === "svelte") {
-      if (opener === "{") {
-        let role: TemplateRole = "expression";
-        if (name.startsWith("let:") === true) {
-          role = "params";
-        }
-        this.addSpan(role, valueStart + 1, this.index - 1, `${name}={%}`);
-        return;
-      }
-      // `class="card {size}"` - every `{...}` inside a quoted value is code.
-      if (QUOTE_CHARS.has(opener) === true) {
-        let cursor = valueStart + 1;
-        while (cursor < this.index - 1) {
-          if (this.source[cursor] !== "{") {
-            cursor += 1;
-            continue;
-          }
-          const close = findTopLevel(this.source, "}", cursor + 1);
-          if (close === -1) {
-            return;
-          }
-          this.addSpan("expression", cursor + 1, close, `${name}="{%}"`);
-          cursor = close + 1;
-        }
-      }
-      return;
-    }
-
-    let start = valueStart;
-    let end = this.index;
-    if (QUOTE_CHARS.has(opener) === true) {
-      start += 1;
-      end -= 1;
-    }
-    const label = `${name}="%"`;
-    if (VUE_CONDITIONS.has(name) === true) {
-      this.addSpan("condition", start, end, label);
-    } else if (name === "v-for") {
-      this.addVueFor(start, end, label);
-    } else if (name.startsWith("v-slot") === true || name.startsWith("#") === true) {
-      this.addSpan("params", start, end, label);
-    } else if (name.startsWith("@") === true || name.startsWith("v-on") === true) {
-      this.addSpan("handler", start, end, label);
-    } else if (
-      name.startsWith(":") === true ||
-      name.startsWith(".") === true ||
-      name.startsWith("v-") === true
-    ) {
-      this.addSpan("expression", start, end, label);
-    }
-  }
-
-  // `v-for="(item, index) in items"`: the alias is a parameter list, the
-  // source an expression.
-  private addVueFor(start: number, end: number, label: string): void {
-    const text = this.source.slice(start, end);
-    let splitAt = findTopLevel(text, " in ", 0);
-    if (splitAt === -1) {
-      splitAt = findTopLevel(text, " of ", 0);
-    }
-    if (splitAt === -1) {
-      return;
-    }
-    let aliasStart = start;
-    let aliasEnd = start + splitAt;
-    const alias = text.slice(0, splitAt).trim();
-    if (alias.startsWith("(") === true && alias.endsWith(")") === true) {
-      aliasStart = start + text.indexOf("(") + 1;
-      aliasEnd = start + text.slice(0, splitAt).lastIndexOf(")");
-    }
-    this.addSpan("params", aliasStart, aliasEnd, label);
-    this.addSpan("expression", start + splitAt + 4, end, label);
-  }
-
-  /** One Svelte `{...}` tag, `start`/`end` bounding the text inside the braces. */
-  private addSvelteBlock(start: number, end: number): void {
-    const body = this.source.slice(start, end);
-    const trimmed = body.trimStart();
-    const offset = start + body.length - trimmed.length;
-
-    if (trimmed.startsWith("#each") === true) {
-      this.addSvelteEach(offset + 5, end);
-      return;
-    }
-    if (trimmed.startsWith("#await") === true) {
-      const awaitStart = offset + 6;
-      const awaited = this.source.slice(awaitStart, end);
-      let splitAt = findTopLevel(awaited, " then", 0);
-      let keyword = " then";
-      if (splitAt === -1) {
-        splitAt = findTopLevel(awaited, " catch", 0);
-        keyword = " catch";
-      }
-      if (splitAt === -1) {
-        this.addSpan("expression", awaitStart, end, "{#await %}");
-        return;
-      }
-      this.addSpan("expression", awaitStart, awaitStart + splitAt, "{#await %}");
-      this.addSpan("params", awaitStart + splitAt + keyword.length, end, "{#await %}");
-      return;
-    }
-    if (trimmed.startsWith("#snippet") === true) {
-      // `{#snippet row(item, index)}` - the parameters are the code.
-      const open = this.source.indexOf("(", offset);
-      const close = this.source.lastIndexOf(")", end);
-      if (open !== -1 && open < end && close > open) {
-        this.addSpan("params", open + 1, close, "{#snippet %}");
-      }
-      return;
-    }
-    for (const block of SVELTE_BLOCKS) {
-      if (trimmed.startsWith(block.prefix) === true) {
-        this.addSpan(block.role, offset + block.prefix.length, end, `{${block.prefix} %}`);
-        return;
-      }
-    }
-    // Block markers with no code of their own: `{/if}`, `{:else}`, ...
-    for (const marker of ["#", "@", ":", "/"]) {
-      if (trimmed.startsWith(marker) === true) {
-        return;
-      }
-    }
-    this.addSpan("expression", start, end, "{%}");
-  }
-
-  // `{#each items as item, index (item.id)}` - and Svelte 5's `{#each items,
-  // index}` with no binding. The binding and index together are one
-  // parameter list; the key is an expression.
-  private addSvelteEach(start: number, end: number): void {
-    const text = this.source.slice(start, end);
-    const asAt = findTopLevel(text, " as ", 0);
-    if (asAt === -1) {
-      const commaAt = findTopLevel(text, ",", 0);
-      if (commaAt === -1) {
-        this.addSpan("expression", start, end, "{#each %}");
-        return;
-      }
-      this.addSpan("expression", start, start + commaAt, "{#each %}");
-      this.addSpan("params", start + commaAt + 1, end, "{#each %}");
-      return;
-    }
-    this.addSpan("expression", start, start + asAt, "{#each %}");
-    const bindingStart = asAt + 4;
-    const keyAt = findTopLevel(text, "(", bindingStart);
-    if (keyAt === -1) {
-      this.addSpan("params", start + bindingStart, end, "{#each %}");
-      return;
-    }
-    this.addSpan("params", start + bindingStart, start + keyAt, "{#each %}");
-    this.addSpan("expression", start + keyAt + 1, start + text.lastIndexOf(")"), "{#each %}");
   }
 
   private addSpan(role: TemplateRole, start: number, end: number, label: string): void {
@@ -457,38 +469,6 @@ class MarkupScanner {
       }
       this.index += 1;
     }
-  }
-
-  private isExemptName(name: string, tagName: string): boolean {
-    // Directives (bind:/on:/class:/let:, v-slot:, xmlns:) are valueless by
-    // design; script/style tags carry mode markers with no explicit form.
-    if (name.includes(":") === true || RAW_TEXT_TAGS.has(tagName) === true) {
-      return true;
-    }
-    if (this.flavor === "vue") {
-      return (
-        name.startsWith("v-") === true ||
-        name.startsWith("@") === true ||
-        name.startsWith("#") === true
-      );
-    }
-    return false;
-  }
-
-  private record(name: string, at: number): void {
-    let context = `Bare template attribute relies on the implicit-true convention - write ${name}={true}`;
-    if (this.flavor === "vue") {
-      context = `Bare template attribute relies on the implicit-true convention - write :${name}="true"`;
-    }
-    const before = this.source.slice(0, at);
-    this.results.push({
-      file: this.filename,
-      line: before.split("\n").length,
-      column: at - before.lastIndexOf("\n") - 1,
-      code: name,
-      context,
-      checkType: CheckType.BOOL_ATTR,
-    });
   }
 
   private skipWhitespace(): void {

@@ -14,3 +14,11 @@ report(table[row]![column]!);
 if (request !== null) {
   report(request.headers);
 }
+
+// Definite assignment is the same presence claim, made at the declaration.
+class Session {
+  token!: string; // expect: non_null
+  label: string | null = null;
+}
+let config!: Config; // expect: non_null
+report(Session, config, config);

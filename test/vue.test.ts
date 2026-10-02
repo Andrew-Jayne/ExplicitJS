@@ -58,16 +58,17 @@ Deno.test("extract: lang attribute picks the dialect", () => {
 });
 
 Deno.test("extract: plain script and script setup both come back", () => {
-  const SOURCE = [
-    '<script lang="ts">',
-    "export const kind = 'options';",
-    "</script>",
-    '<script setup lang="ts">',
-    "console.log(kind);",
-    "</script>",
-    "<template><div /></template>",
-  ].join("\n");
-  const blocks = extractVueScripts(SOURCE);
+  const blocks = extractVueScripts(
+    [
+      '<script lang="ts">',
+      "export const kind = 'options';",
+      "</script>",
+      '<script setup lang="ts">',
+      "console.log(kind);",
+      "</script>",
+      "<template><div /></template>",
+    ].join("\n"),
+  );
   assertEquals(blocks.length, 2);
   assertEquals(blockAt(blocks, 0).lang, "ts");
   assertEquals(blockAt(blocks, 1).lang, "ts");
@@ -120,15 +121,17 @@ Deno.test("analyze: lang=ts block parses TypeScript syntax", () => {
 });
 
 Deno.test("analyze: checks from both script blocks merge", () => {
-  const SOURCE = [
-    "<script>",
-    "if (settings) {}",
-    "</script>",
-    "<script setup>",
-    "if (items) {}",
-    "</script>",
-  ].join("\n");
-  const checks = analyzeSource(SOURCE, "case.vue");
+  const checks = analyzeSource(
+    [
+      "<script>",
+      "if (settings) {}",
+      "</script>",
+      "<script setup>",
+      "if (items) {}",
+      "</script>",
+    ].join("\n"),
+    "case.vue",
+  );
   assertEquals(checks.length, 2);
   assertEquals(checkAt(checks, 0).line, 2);
   assertEquals(checkAt(checks, 1).line, 5);

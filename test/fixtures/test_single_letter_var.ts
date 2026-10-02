@@ -41,7 +41,7 @@ for (const [key, value] of pairs) {
 const [_, second] = pair;
 report(second, second);
 
-export const norm = ({ q }: { q: number }) => q * q; // expect: single_letter_var
+export const norm = ({ q }: { q: number }) => q * q; // expect: single_letter_var, single_letter_var
 
 import { readFileSync as r } from "node:fs"; // expect: single_letter_var
 import * as m from "node:path"; // expect: single_letter_var
@@ -53,7 +53,7 @@ report(𝑟 * 𝑟);
 
 class Calculator {
   f = (amount: number) => amount * 2; // expect: single_letter_var
-  x = 0;
+  x = 0; // expect: single_letter_var
 }
 report(new Calculator(), Calculator);
 
@@ -66,3 +66,35 @@ try {
 const _ = loadDiscarded();
 report(_.size); // expect: single_letter_var
 items.forEach((_, index) => report(index));
+
+// No single-letter name anywhere, for any reason: types, generics, members,
+// keys, enum members, labels, export aliases.
+export function identity<T>(value: T): T { // expect: single_letter_var
+  return value;
+}
+export type V = { label: string }; // expect: single_letter_var
+export interface Q { // expect: single_letter_var
+  z: number; // expect: single_letter_var
+  m(): void; // expect: single_letter_var
+}
+export enum Direction {
+  N = "north", // expect: single_letter_var
+  South = "south",
+}
+export const origin = { w: 0, height: 0 }; // expect: single_letter_var
+export const quoted = { "h": 1, "0": 2 }; // expect: single_letter_var
+export class Vector {
+  #j = 0; // expect: single_letter_var
+  get k(): number { // expect: single_letter_var
+    return this.#j;
+  }
+}
+export type Keys<Shape> = { [P in keyof Shape]: Shape[P] }; // expect: single_letter_var
+o: for (const entry of entries) { // expect: single_letter_var
+  report(entry);
+  break o;
+}
+export { origin as g }; // expect: single_letter_var
+export { quoted };
+const point = { x: 1 }; // expect: single_letter_var
+report(point.x, point);

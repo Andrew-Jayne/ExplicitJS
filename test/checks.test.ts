@@ -228,7 +228,12 @@ const CASES: Case[] = [
   {
     name: "single_use_var: ALL_CAPS constant is exempt, lowercase is not",
     source:
-      "export function demo(): number { const MAX_RETRIES = compute(); const attempts = compute(); return MAX_RETRIES + attempts; }",
+      "export function demo(): number { const MAX_RETRIES = 3; const attempts = compute(); return MAX_RETRIES + attempts; }",
+    expect: { single_use_var: 1 },
+  },
+  {
+    name: "single_use_var: ALL_CAPS on a runtime value is not exempt",
+    source: "export function demo(): number { const MAX_RETRIES = compute(); return MAX_RETRIES; }",
     expect: { single_use_var: 1 },
   },
   {

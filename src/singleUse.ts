@@ -40,6 +40,21 @@ import { CheckType, type StyleCheck } from "./constructs.ts";
 
 const EXCLUDED_NAMES: ReadonlySet<string> = new Set(["_"]);
 
+const LITERAL_KEYWORDS: ReadonlySet<ts.SyntaxKind> = new Set([
+  ts.SyntaxKind.TrueKeyword,
+  ts.SyntaxKind.FalseKeyword,
+  ts.SyntaxKind.NullKeyword,
+]);
+
+// Built-in containers whose contents, not identity, make them constant.
+const CONSTANT_CONSTRUCTORS: ReadonlySet<string> = new Set([
+  "Set",
+  "Map",
+  "WeakSet",
+  "WeakMap",
+  "RegExp",
+]);
+
 // `helper.call(...)` / `helper.apply(...)` invoke the function on the spot.
 const INVOKING_METHODS: ReadonlySet<string> = new Set(["call", "apply"]);
 
@@ -51,6 +66,7 @@ interface Position {
 interface PendingWrite {
   name: string;
   at: Position;
+  isConstantValue: boolean;
 }
 
 interface PendingRead {
@@ -68,6 +84,8 @@ interface Scope {
   varDefs: Map<string, Position[]>;
   funcDefs: Map<string, Position[]>;
   funcValuedVars: Set<string>;
+  /** UPPER_SNAKE names bound to a value computed at runtime: no constant exemption. */
+  runtimeConstants: Set<string>;
   reads: PendingRead[];
   writes: PendingWrite[];
   ownReads: Map<string, number>;
@@ -160,6 +178,9 @@ export function findSingleUse(
       }
       target.declared.add(write.name);
       record(target.varDefs, write.name, write.at);
+      if (write.isConstantValue === false) {
+        target.runtimeConstants.add(write.name);
+      }
     }
   }
 
@@ -209,11 +230,14 @@ export function findSingleUse(
     }
 
     for (const [name, positions] of scope.varDefs) {
-      if (EXCLUDED_NAMES.has(name) === true || isDunder(name) === true) {
+      if (EXCLUDED_NAMES.has(name) === true) {
         continue;
       }
-      // UPPER_SNAKE_CASE (with at least one letter) marks a deliberate constant.
-      if (name === name.toUpperCase() && /[a-zA-Z]/.test(name) === true) {
+      // UPPER_SNAKE_CASE (with at least one letter) marks a deliberate
+      // constant - but only a value that is one. `const USER = await
+      // fetchUser()` is a runtime value in capitals, not a constant.
+      const isUpperName = name === name.toUpperCase() && /[a-zA-Z]/.test(name) === true;
+      if (isUpperName === true && scope.runtimeConstants.has(name) === false) {
         continue;
       }
       if (ctx.exportedNames.has(name) === true) {
@@ -236,21 +260,22 @@ export function findSingleUse(
       }
       if (flaggable === true) {
         const at = positions[0]!;
+        let context = `Variable '${name}' is only used once, consider inlining the expression or declare it in UPPER_SNAKE_CASE to mark as a deliberate constant`;
+        if (isUpperName === true) {
+          context = `Variable '${name}' is only used once - UPPER_SNAKE_CASE exempts only constant values (literals, and constants built from them), and this one is computed at runtime; inline the expression`;
+        }
         ctx.results.push({
           file: ctx.filename,
           line: at.line,
           column: at.column,
           code: name,
-          context: `Variable '${name}' is only used once, consider inlining the expression or declare it in UPPER_SNAKE_CASE to mark as a deliberate constant`,
+          context,
           checkType: CheckType.SINGLE_USE_VAR,
         });
       }
     }
 
     for (const [name, positions] of scope.funcDefs) {
-      if (isDunder(name) === true) {
-        continue;
-      }
       if (ctx.exportedNames.has(name) === true) {
         continue;
       }
@@ -301,6 +326,7 @@ function createScope(parent: Scope | undefined, isClass: boolean, ctx: ScopeCont
     varDefs: new Map(),
     funcDefs: new Map(),
     funcValuedVars: new Set(),
+    runtimeConstants: new Set(),
     reads: [],
     writes: [],
     ownReads: new Map(),
@@ -349,6 +375,65 @@ function collect(node: ts.Node, scope: Scope, ctx: ScopeContext): void {
     for (const member of node.members) {
       collect(member, classScope, ctx);
     }
+
+    // A `#private` (or TypeScript `private`) method is callable only inside
+    // its own class, so unlike a public method every caller is in view: one
+    // call makes it a single-use helper. Uses are counted by member name
+    // across the class body; passing it by name (`.map(this.#format)`)
+    // exempts it, as for functions.
+    const privateMethods = new Map<string, ts.MethodDeclaration>();
+    for (const member of node.members) {
+      if (
+        ts.isMethodDeclaration(member) === true &&
+        member.body !== undefined &&
+        (ts.isPrivateIdentifier(member.name) === true ||
+          (ts.isIdentifier(member.name) === true &&
+            (ts.getCombinedModifierFlags(member) & ts.ModifierFlags.Private) !== 0))
+      ) {
+        privateMethods.set(member.name.text, member);
+      }
+    }
+    if (privateMethods.size > 0) {
+      const calls = new Map<string, number>();
+      const bareUses = new Map<string, number>();
+      const pending: ts.Node[] = [...node.members];
+      let current = pending.pop();
+      while (current !== undefined) {
+        if (
+          ts.isPropertyAccessExpression(current) === true &&
+          privateMethods.has(current.name.text) === true
+        ) {
+          if (isInvoked(current) === true) {
+            bump(calls, current.name.text);
+          } else {
+            bump(bareUses, current.name.text);
+          }
+        } else if (
+          ts.isElementAccessExpression(current) === true &&
+          ts.isStringLiteralLike(current.argumentExpression) === true &&
+          privateMethods.has(current.argumentExpression.text) === true
+        ) {
+          bump(bareUses, current.argumentExpression.text);
+        }
+        ts.forEachChild(current, (child) => {
+          pending.push(child);
+        });
+        current = pending.pop();
+      }
+      for (const [name, method] of privateMethods) {
+        if (calls.get(name) === 1 && bareUses.get(name) === undefined) {
+          const at = position(method.name, ctx.sourceFile);
+          ctx.results.push({
+            file: ctx.filename,
+            line: at.line,
+            column: at.column,
+            code: `${name}(...)`,
+            context: `Private method '${name}' is only called once - inline it at the call site`,
+            checkType: CheckType.SINGLE_USE_FUNC,
+          });
+        }
+      }
+    }
     return;
   }
 
@@ -365,6 +450,9 @@ function collect(node: ts.Node, scope: Scope, ctx: ScopeContext): void {
         ts.isFunctionExpression(node.initializer) === true
       ) {
         scope.funcValuedVars.add(node.name.text);
+      }
+      if (isConstantExpression(node.initializer) === false) {
+        scope.runtimeConstants.add(node.name.text);
       }
     } else if (ts.isIdentifier(node.name) === false && node.initializer !== undefined) {
       // `const { profile } = user` is `user.profile` with a detour; a pattern
@@ -390,6 +478,7 @@ function collect(node: ts.Node, scope: Scope, ctx: ScopeContext): void {
         scope.writes.push({
           name: node.left.text,
           at: position(node.left, ctx.sourceFile),
+          isConstantValue: isConstantExpression(node.right),
         });
       }
       collect(node.right, scope, ctx);
@@ -529,39 +618,9 @@ function collect(node: ts.Node, scope: Scope, ctx: ScopeContext): void {
     }
 
     if (isRead === true) {
-      // A call read means the identifier is invoked rather than passed along:
-      // `helper()`, and the same call spelled `(helper)()`,
-      // `helper.call(...)` / `helper.apply(...)`, ``helper`...` ``, or
-      // `new Helper()`.
-      let callee: ts.Node = node;
-      while (callee.parent !== undefined && ts.isParenthesizedExpression(callee.parent) === true) {
-        callee = callee.parent;
-      }
-      const calleeParent = callee.parent;
-      let isCall = false;
-      if (calleeParent !== undefined) {
-        if (
-          ts.isCallExpression(calleeParent) === true ||
-          ts.isNewExpression(calleeParent) === true
-        ) {
-          isCall = calleeParent.expression === callee;
-        } else if (ts.isTaggedTemplateExpression(calleeParent) === true) {
-          isCall = calleeParent.tag === callee;
-        } else if (
-          ts.isPropertyAccessExpression(calleeParent) === true &&
-          calleeParent.expression === callee &&
-          INVOKING_METHODS.has(calleeParent.name.text) === true
-        ) {
-          const grandparent = calleeParent.parent;
-          isCall =
-            grandparent !== undefined &&
-            ts.isCallExpression(grandparent) === true &&
-            grandparent.expression === calleeParent;
-        }
-      }
       scope.reads.push({
         name: node.text,
-        isCall,
+        isCall: isInvoked(node),
         at: position(node, ctx.sourceFile),
       });
     }
@@ -675,6 +734,123 @@ function isCalledOnce(scope: Scope, name: string, positions: Position[]): boolea
 
 // --- helpers ----------------------------------------------------------------
 
+/**
+ * True when the expression is invoked rather than passed along: `helper()`,
+ * and the same call spelled `(helper)()`, `helper.call(...)` /
+ * `helper.apply(...)`, ``helper`...` ``, or `new Helper()`.
+ */
+function isInvoked(expression: ts.Node): boolean {
+  let callee: ts.Node = expression;
+  while (callee.parent !== undefined && ts.isParenthesizedExpression(callee.parent) === true) {
+    callee = callee.parent;
+  }
+  const parent = callee.parent;
+  if (parent === undefined) {
+    return false;
+  }
+  if (ts.isCallExpression(parent) === true || ts.isNewExpression(parent) === true) {
+    return parent.expression === callee;
+  }
+  if (ts.isTaggedTemplateExpression(parent) === true) {
+    return parent.tag === callee;
+  }
+  if (
+    ts.isPropertyAccessExpression(parent) === true &&
+    parent.expression === callee &&
+    INVOKING_METHODS.has(parent.name.text) === true
+  ) {
+    const grandparent = parent.parent;
+    return (
+      grandparent !== undefined &&
+      ts.isCallExpression(grandparent) === true &&
+      grandparent.expression === parent
+    );
+  }
+  return false;
+}
+
+/**
+ * A value fixed before the program runs: literals, and arrays, objects,
+ * templates, operators, `new Set/Map/RegExp(...)` and member accesses built
+ * only from literals and other UPPER_SNAKE constants. Calls, `await`,
+ * functions, and reads of ordinary variables are runtime values.
+ */
+function isConstantExpression(expression: ts.Expression): boolean {
+  if (
+    ts.isParenthesizedExpression(expression) === true ||
+    ts.isAsExpression(expression) === true ||
+    ts.isSatisfiesExpression(expression) === true ||
+    ts.isTypeAssertionExpression(expression) === true
+  ) {
+    return isConstantExpression(expression.expression);
+  }
+  if (
+    ts.isLiteralExpression(expression) === true ||
+    LITERAL_KEYWORDS.has(expression.kind) === true
+  ) {
+    return true;
+  }
+  if (ts.isIdentifier(expression) === true) {
+    return (
+      expression.text === "undefined" ||
+      (expression.text === expression.text.toUpperCase() &&
+        /[a-zA-Z]/.test(expression.text) === true)
+    );
+  }
+  if (ts.isPropertyAccessExpression(expression) === true) {
+    return isConstantExpression(expression.expression);
+  }
+  if (ts.isPrefixUnaryExpression(expression) === true) {
+    return isConstantExpression(expression.operand);
+  }
+  if (ts.isBinaryExpression(expression) === true) {
+    return (
+      isConstantExpression(expression.left) === true &&
+      isConstantExpression(expression.right) === true
+    );
+  }
+  if (ts.isTemplateExpression(expression) === true) {
+    return expression.templateSpans.every((span) => isConstantExpression(span.expression) === true);
+  }
+  if (ts.isArrayLiteralExpression(expression) === true) {
+    return expression.elements.every((element) => {
+      if (ts.isSpreadElement(element) === true) {
+        return isConstantExpression(element.expression) === true;
+      }
+      return isConstantExpression(element) === true;
+    });
+  }
+  if (ts.isObjectLiteralExpression(expression) === true) {
+    return expression.properties.every((property) => {
+      if (ts.isPropertyAssignment(property) === true) {
+        return (
+          (ts.isComputedPropertyName(property.name) === false ||
+            isConstantExpression(property.name.expression) === true) &&
+          isConstantExpression(property.initializer) === true
+        );
+      }
+      if (ts.isShorthandPropertyAssignment(property) === true) {
+        return isConstantExpression(property.name) === true;
+      }
+      if (ts.isSpreadAssignment(property) === true) {
+        return isConstantExpression(property.expression) === true;
+      }
+      return false;
+    });
+  }
+  if (
+    ts.isNewExpression(expression) === true &&
+    ts.isIdentifier(expression.expression) === true &&
+    CONSTANT_CONSTRUCTORS.has(expression.expression.text) === true
+  ) {
+    if (expression.arguments === undefined) {
+      return true;
+    }
+    return expression.arguments.every((argument) => isConstantExpression(argument) === true);
+  }
+  return false;
+}
+
 function bump(counter: Map<string, number>, name: string): void {
   const current = counter.get(name);
   if (current === undefined) {
@@ -696,8 +872,4 @@ function record(map: Map<string, Position[]>, name: string, at: Position): void 
 function position(node: ts.Node, sourceFile: ts.SourceFile): Position {
   const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
   return { line: line + 1, column: character };
-}
-
-function isDunder(name: string): boolean {
-  return name.length > 4 && name.startsWith("__") === true && name.endsWith("__") === true;
 }

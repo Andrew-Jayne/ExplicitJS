@@ -1,24 +1,24 @@
 
 📊 Check Statistics
 ══════════════════════════════════════════════════
-Total files analyzed: 31
-Total checks found: 160
+Total files analyzed: 32
+Total checks found: 193
 
 By type:
-  bool_op                 23 ( 14.4%) ███████
-  single_letter_var       18 ( 11.3%) █████
-  assert                  13 (  8.1%) ████
-  filter                  13 (  8.1%) ████
-  optional_param          13 (  8.1%) ████
-  if                      12 (  7.5%) ███
-  ternary                 10 (  6.3%) ███
-  optional_chain           8 (  5.0%) ██
-  not                      7 (  4.4%) ██
-  bool_attr                6 (  3.8%) █
-  loose_equality           6 (  3.8%) █
-  single_use_var           6 (  3.8%) █
-  single_use_func          6 (  3.8%) █
-  arrow                    5 (  3.1%) █
-  non_null                 5 (  3.1%) █
-  nullish_coalesce         5 (  3.1%) █
-  while                    4 (  2.5%) █
+  single_letter_var       34 ( 17.6%) ████████
+  bool_op                 23 ( 11.9%) █████
+  assert                  16 (  8.3%) ████
+  optional_param          15 (  7.8%) ███
+  filter                  13 (  6.7%) ███
+  if                      12 (  6.2%) ███
+  ternary                 10 (  5.2%) ██
+  nullish_coalesce        10 (  5.2%) ██
+  single_use_var           9 (  4.7%) ██
+  optional_chain           8 (  4.1%) ██
+  single_use_func          8 (  4.1%) ██
+  non_null                 7 (  3.6%) █
+  not                      7 (  3.6%) █
+  bool_attr                6 (  3.1%) █
+  loose_equality           6 (  3.1%) █
+  arrow                    5 (  2.6%) █
+  while                    4 (  2.1%) █

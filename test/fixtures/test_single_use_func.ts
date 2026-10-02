@@ -53,3 +53,27 @@ function boundOnce(): string {
   return "bound";
 }
 report(boundOnce.bind(null));
+
+// Private methods are callable only inside their class, so every call is in
+// view: one call makes a single-use helper. Public methods are exempt.
+export class Job {
+  #double(amount: number): number { // expect: single_use_func
+    return amount * 2;
+  }
+  private triple(amount: number): number { // expect: single_use_func
+    return amount * 3;
+  }
+  private halve(amount: number): number {
+    return amount / 2;
+  }
+  #format(amount: number): string {
+    return `${amount}`;
+  }
+  public quadruple(amount: number): number {
+    return amount * 4;
+  }
+  run(): number[] {
+    report([1].map(this.#format));
+    return [this.#double(1), this.triple(1), this.halve(1), this.halve(2), this.quadruple(1)];
+  }
+}

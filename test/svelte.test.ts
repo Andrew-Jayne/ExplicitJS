@@ -60,16 +60,17 @@ Deno.test("extract: lang attribute marks TypeScript in any quote style", () => {
 });
 
 Deno.test("extract: module and instance scripts both come back", () => {
-  const SOURCE = [
-    '<script context="module" lang="ts">',
-    "export const kind = 'module';",
-    "</script>",
-    '<script lang="ts">',
-    "console.log(kind);",
-    "</script>",
-    "<div />",
-  ].join("\n");
-  const blocks = extractSvelteScripts(SOURCE);
+  const blocks = extractSvelteScripts(
+    [
+      '<script context="module" lang="ts">',
+      "export const kind = 'module';",
+      "</script>",
+      '<script lang="ts">',
+      "console.log(kind);",
+      "</script>",
+      "<div />",
+    ].join("\n"),
+  );
   assertEquals(blocks.length, 2);
   assertEquals(blockAt(blocks, 0).isTypeScript, true);
   assertEquals(blockAt(blocks, 1).isTypeScript, true);
@@ -134,15 +135,17 @@ Deno.test("analyze: lang=ts block parses TypeScript syntax", () => {
 });
 
 Deno.test("analyze: checks from module and instance scripts merge", () => {
-  const SOURCE = [
-    '<script context="module">',
-    "if (settings) {}",
-    "</script>",
-    "<script>",
-    "if (items) {}",
-    "</script>",
-  ].join("\n");
-  const checks = analyzeSource(SOURCE, "case.svelte");
+  const checks = analyzeSource(
+    [
+      '<script context="module">',
+      "if (settings) {}",
+      "</script>",
+      "<script>",
+      "if (items) {}",
+      "</script>",
+    ].join("\n"),
+    "case.svelte",
+  );
   assertEquals(checks.length, 2);
   assertEquals(checkAt(checks, 0).line, 2);
   assertEquals(checkAt(checks, 1).line, 5);

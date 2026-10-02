@@ -25,7 +25,7 @@ report(firstEntry);
 const { data, error } = response;
 report(data, error);
 
-const { port = 3000 } = settings;
+const { port = 3000 } = settings; // expect: nullish_coalesce
 report(port);
 
 // A no-op statement does not count as a use.
@@ -37,3 +37,18 @@ report(padded);
 // A type-member name is not a read of the same-named variable.
 const label = buildLabel(); // expect: single_use_var
 render(label, { label: "", size: 1 } as { label: string; size: number });
+
+// UPPER_SNAKE_CASE exempts constant values only.
+const USER = await fetchUser(userId); // expect: single_use_var
+report(USER);
+const LIMITS = { max: 10, min: MAX_RETRIES * 2, label: `max ${MAX_RETRIES}` };
+report(LIMITS);
+const NAMES = new Set(["admin", "owner"]);
+report(NAMES);
+let CONFIG;
+CONFIG = loadConfig(); // expect: single_use_var
+report(CONFIG);
+
+// `__name__` means nothing special in JS: no Python-style dunder exemption.
+const __result__ = computeTotal(); // expect: single_use_var
+report(__result__);

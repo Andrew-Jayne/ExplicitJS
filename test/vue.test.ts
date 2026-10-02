@@ -100,13 +100,13 @@ Deno.test("analyze: checks fire inside vue scripts with original lines", () => {
   assertEquals(checkAt(checks, 0).line, 5);
 });
 
-Deno.test("analyze: template is not analyzed", () => {
+Deno.test("analyze: template conditions are checked like script ones", () => {
   assertEquals(
     analyzeSource(
-      '<template>\n  <div v-if="visible">{{ value }}</div>\n</template>\n<script setup>\nif (items) {}\n</script>\n',
+      '<template>\n  <div v-if="visible">{{ value }}</div>\n  <p v-if="count > 0">{{ count }}</p>\n</template>\n<script setup>\nif (items) {}\n</script>\n',
       "case.vue",
-    ).length,
-    1,
+    ).map((check) => `${check.line}:${check.checkType}`),
+    ["6:if", "2:if"],
   );
 });
 

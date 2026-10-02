@@ -39,3 +39,14 @@ export function shout(message?: string): string { // expect: optional_param
 }
 
 export type Pair = [name: string, label?: string];
+
+// Optional-everything without a `?` on any member.
+export function configure(options: Partial<Greeter>): void { // expect: optional_param
+  report(options);
+}
+export type Draft = Partial<Pick<Greeter, "format">>; // expect: optional_param
+export type Loose<Shape> = { [Key in keyof Shape]?: Shape[Key] }; // expect: optional_param
+export type Looser<Shape> = { [Key in keyof Shape]+?: Shape[Key] }; // expect: optional_param
+export type Nullable<Shape> = { [Key in keyof Shape]: Shape[Key] | null };
+export type Complete<Shape> = { [Key in keyof Shape]-?: Shape[Key] };
+export type Whole = Required<Greeter>;

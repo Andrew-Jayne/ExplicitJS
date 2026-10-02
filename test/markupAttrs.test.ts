@@ -52,6 +52,12 @@ const CASES: MarkupCase[] = [
     expected: ["multiple"],
   },
   {
+    name: "a lone '{' in vue text is plain text, not an unclosed expression",
+    flavor: "vue",
+    source: "<p>Press { to open a block</p><Widget active />",
+    expected: ["active"],
+  },
+  {
     name: "vue mustaches never read as tags",
     flavor: "vue",
     source: "<span>{{ count < 5 }}</span><input loop >",

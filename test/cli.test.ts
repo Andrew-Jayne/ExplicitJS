@@ -45,34 +45,25 @@ interface JsonCheck {
   check_type: string;
 }
 
-function jsonToCounter(stdout: string): CheckCounter {
-  const counter: CheckCounter = new Map();
-  for (const item of JSON.parse(stdout) as JsonCheck[]) {
-    incrementCount(counter, `${item.line}:${item.check_type}`);
-  }
-  return counter;
-}
-
-function assertCliMatchesMarkers(fixturePath: string): void {
-  const expected = parseFixture(fixturePath).expected;
-  const result = runCli([fixturePath, "--format", "json"]);
-  const actual = jsonToCounter(result.stdout);
-
-  if (countersEqual(expected, actual) === false) {
-    throw new Error(
-      `\n${path.basename(fixturePath)} CLI JSON mismatch:\n${formatDiff(expected, actual)}`,
-    );
-  }
-  if (expected.size > 0) {
-    assertEquals(result.code, 1);
-  } else {
-    assertEquals(result.code, 0);
-  }
-}
-
 for (const fixturePath of discoverFixtures()) {
   Deno.test(`cli json: ${path.basename(fixturePath)}`, () => {
-    assertCliMatchesMarkers(fixturePath);
+    const expected = parseFixture(fixturePath).expected;
+    const result = runCli([fixturePath, "--format", "json"]);
+    const actual: CheckCounter = new Map();
+    for (const item of JSON.parse(result.stdout) as JsonCheck[]) {
+      incrementCount(actual, `${item.line}:${item.check_type}`);
+    }
+
+    if (countersEqual(expected, actual) === false) {
+      throw new Error(
+        `\n${path.basename(fixturePath)} CLI JSON mismatch:\n${formatDiff(expected, actual)}`,
+      );
+    }
+    if (expected.size > 0) {
+      assertEquals(result.code, 1);
+    } else {
+      assertEquals(result.code, 0);
+    }
   });
 }
 

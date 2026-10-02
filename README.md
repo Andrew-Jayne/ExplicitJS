@@ -22,24 +22,26 @@ Every check is always on. Like [Black](https://github.com/psf/black), ExplicitJS
 
 | Check | What's ambiguous | What to write instead |
 |---|---|---|
-| **Implicit booleans** in `if` / `while` / `do…while` | `if (items)` — checking length? nullness? | `if (items.length > 0)` or `if (items !== null)` |
-| **`assert` truthiness** (`assert(x)`, `console.assert(x)`, `assert.ok(x)`) | Relies on coercion | `assert(x !== undefined)` |
+| **Implicit booleans** in `if` / `while` / `do…while` / `for (…; cond; …)` | `if (items)` — checking length? nullness? | `if (items.length > 0)` or `if (items !== null)` |
+| **`assert` truthiness** (`assert(x)`, `console.assert(x)`, `assert.ok(x)`, `assert.strict(x)` — including import aliases like `import { ok } from "node:assert"`) | Relies on coercion | `assert(x !== undefined)` |
 | **Ternary expressions** | `cond ? x : y` — buries control flow | Explicit `if`/`else` block |
 | **Nullish coalescing** (`??`, `??=`) | `env.PORT ?? 3000` — an inline if in disguise | Explicit `=== null` / `=== undefined` check with `if`/`else` |
 | **Optional chaining** | `request?.headers?.token` — is a missing field expected or a bug? | Validate the shape once (schema/type), then access directly |
+| **Non-null assertions** | `request!.headers!.token` — presence claimed, never checked | Validate the shape, or test `=== null` / `=== undefined` explicitly. `items[0]!` index access is exempt (the `noUncheckedIndexedAccess` idiom) |
 | **Optional members** (`name?: T`) | `label?: string` on a parameter, property or method — is an absent value meaningful or an accident? | `label: string \| null`, plus `= null` where a default is legal |
 | **Boolean operators** | `a && b`, `a \|\| b`, `a \|\|= b`, `a &&= b` with non-boolean operands | Explicit comparisons for each operand |
+| **Negation** outside a condition | `const missing = !items`, `return !value`, `if (!items === true)` — the same coercion as `if (items)`, moved somewhere the condition check can't see it | `items === null`, `value.length === 0`, `ready === false` |
 | **Bare attributes** (JSX, Svelte/Vue templates) | `<Widget active />` — `true` only by convention | `<Widget active={true} />` / `:active="true"` |
 | **Implicit booleans in arrow / function expressions** | Truthiness hidden in anonymous logic | Named function with explicit comparisons |
-| **`.filter(Boolean)`** | Implicit truthiness as a filter predicate | Explicit predicate, e.g. `.filter((value) => value !== undefined)` |
+| **Truthiness predicates** | `.filter(Boolean)`, `.some(String)`, `.every(Number)`, `.find((user) => user.email)` — truthiness as the predicate of `filter` / `find*` / `some` / `every` | Explicit predicate, e.g. `.filter((value) => value !== undefined)` |
 | **Loose equality** (`==`, `!=`) | Coerces operands silently | `===` / `!==` |
-| **Single-letter names** | `x`, `n`, `e` — no semantic meaning | Descriptive names |
+| **Single-letter names** | `x`, `n`, `e` — including destructured (`const { x } = point`, `[k, v]`), imported (`import { join as j }`) and read-back `_` names | Descriptive names |
 | **Single-use variables** | `const r = compute(); return r;` — pointless indirection | Inline the expression |
-| **Single-use functions** | Helper called exactly once | Inline at the call site |
+| **Single-use functions** | Helper called exactly once — from anywhere, including a module-level helper whose one call sits inside another function | Inline the operations at the call site |
 
 Optional chaining and optional members are two halves of one rule. `response?.data?.messages?.text` is only reasonable because something upstream declared those fields optional, so the optional-member check closes the hole: a type that says `data: Data | null` forces the reader — and the next caller — to handle the absent case explicitly instead of chaining past it.
 
-Optional members are flagged wherever `?` appears on a parameter, property or method: implementations, interfaces, type literals, classes and overload signatures alike. Where a default is legal (a parameter of an implementation, a concrete class field) the advice adds `= null`, so existing callers keep working; where it is not, the type carries the `| null` and every construction site states the field. Optional tuple elements (`[name: string, label?: string]`) are out of scope.
+Optional members are flagged wherever `?` appears on a parameter, property or method: implementations, interfaces, type literals, classes and overload signatures alike. Where a default is legal (a parameter of an implementation, a concrete class field) the advice adds `= null`, so existing callers keep working; where it is not, the type carries the `| null` and every construction site states the field. The same goes for optionality that never writes a `?` on a member: `Partial<T>` and a mapped type with `?:` (`{ [Key in keyof T]?: T[Key] }`, which is how `Partial` is defined) make every field optional at once, so both are flagged too; map to `T[Key] | null` instead. `-?` (as in `Required<T>`) removes optionality and is fine. Optional tuple elements (`[name: string, label?: string]`) are out of scope.
 
 ## Usage
 
@@ -58,7 +60,7 @@ explicitjs . --stats-only
 explicitjs list-checks
 ```
 
-`<path>` is any file or directory. ExplicitJS analyzes `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.mts`, `.cts`, plus `.svelte` and `.vue` components (their `<script>` blocks as code, their template markup for bare attributes), and skips `node_modules`, `dist`, `build`, dotfile directories, and `*.d.ts` (add more with `ignore` in [the config file](#configuration)). Files are parsed with the TypeScript compiler, so no `tsconfig` is needed.
+`<path>` is any file or directory. ExplicitJS analyzes `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.mts`, `.cts`, plus `.svelte` and `.vue` components (their `<script>` blocks as code, and their template markup too: bare attributes, plus every template expression — `v-if="items"` and `{#if items}` get the same implicit-boolean check as `if (items)`, and `{{ a ?? b }}`, `{x ? y : z}`, `v-for="(x, i) in rows"` and friends get every code check), and skips `node_modules`, dotfile directories, build output (`dist`, `build`, …) and `*.d.ts` (add more with `ignore` in [the config file](#configuration)). Files are parsed with the TypeScript compiler, so no `tsconfig` is needed.
 
 ### Exit codes
 
@@ -83,7 +85,7 @@ ExplicitJS reads an optional `.explicitrc.json` — discovered by walking up fro
 ```
 
 - **`format`** — the default output format. `--format` overrides it.
-- **`ignore`** — directories to skip **on top of** the built-in list (`node_modules`, `dist`, `build`, `out`, `coverage`, `vendor`, dotfile directories, …), which no config can re-enable. A bare name skips that directory at any depth; an entry containing a separator is a path relative to the config file, so it means the same directory wherever you invoke the tool from. Directories only — no file patterns, no globs.
+- **`ignore`** — directories to skip **on top of** the built-in list, which no config can re-enable: `node_modules` and dotfile directories at any depth, and the build-output names `dist`, `dist-test`, `build`, `out`, `coverage` and `vendor` wherever build tools put them — directly under the analyzed root, or beside a `package.json` / `deno.json`. Elsewhere those names are ordinary source directories (`src/features/build/`) and are checked. A bare name skips that directory at any depth; an entry containing a separator is a path relative to the config file, so it means the same directory wherever you invoke the tool from. Directories only — no file patterns, no globs.
 
 Everything else is a command-line flag: `--stats-only` and `--no-color` are choices about one run, not facts about the project, and putting them in the file does nothing.
 
@@ -98,7 +100,7 @@ The single-use checks deliberately ignore a few legitimate patterns:
 - **Constants** — `UPPER_SNAKE_CASE` names are never flagged as single-use variables; a named constant documents intent even when used once.
 - **Exports** — exported names are never flagged as single-use, since references from outside the file are invisible to a single-file analysis.
 - **Entry points** — functions named `main` are never flagged as single-use functions.
-- **Function references** — a function whose only use passes it **by name** (`React.memo(Component)`, `items.map(helper)`, `onClick={handler}`, a `<Component />` tag) is never flagged as single-use. A named reference is exactly the explicit style this tool asks for; only a genuine call counts as an inlinable use. Ambient `declare function` signatures are exempt for the same reason.
+- **Function references** — a function whose only use passes it **by name** (`React.memo(Component)`, `items.map(helper)`, `onClick={handler}`, a `<Component />` tag) is never flagged as single-use. A named reference is exactly the explicit style this tool asks for; only a genuine call counts as an inlinable use — and `helper.call(…)`, `helper.apply(…)`, `(helper)(…)`, ``helper`…` `` and `new Helper()` are all genuine calls. Ambient `declare function` signatures are exempt for the same reason.
 
 ## Output formats
 

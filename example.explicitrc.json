@@ -4,8 +4,9 @@
   "//format": "text | json | csv. Defaults to text. --format always overrides it.",
   "ignore": [],
   "//ignore": [
-    "Extra directories to skip, on top of the built-in list (node_modules,",
-    "dist, build, out, coverage, vendor, dotfile directories, ...), which no",
+    "Extra directories to skip, on top of the built-in list (node_modules and",
+    "dotfile directories at any depth; dist, build, out, coverage, vendor ...",
+    "beside a package.json/deno.json or under the analyzed root), which no",
     "config can re-enable. A bare name skips that directory at any depth; an",
     "entry containing a separator is a path relative to THIS file. Directories",
     "only - there are no file patterns and no globs."

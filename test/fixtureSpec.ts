@@ -50,8 +50,6 @@ export function incrementCount(counter: CheckCounter, key: string): void {
 /** Parse one fixture's per-line expectation markers. */
 export function parseFixture(fixturePath: string): FixtureSpec {
   const spec: FixtureSpec = { path: fixturePath, expected: new Map() };
-  const fixtureName = path.basename(fixturePath);
-
   for (const [index, raw] of readFileSync(fixturePath, "utf-8").split("\n").entries()) {
     const expectMatch = EXPECT_RE.exec(raw);
     if (expectMatch === null) {
@@ -64,7 +62,9 @@ export function parseFixture(fixturePath: string): FixtureSpec {
         continue;
       }
       if (isCheckType(name) === false) {
-        throw new Error(`${fixtureName}:${lineNumber}: unknown check type '${name}'`);
+        throw new Error(
+          `${path.basename(fixturePath)}:${lineNumber}: unknown check type '${name}'`,
+        );
       }
       incrementCount(spec.expected, `${lineNumber}:${name}`);
     }
@@ -110,21 +110,6 @@ export function countersEqual(left: CheckCounter, right: CheckCounter): boolean 
   return true;
 }
 
-function compareCounterKeys(left: string, right: string): number {
-  const leftLine = Number(left.slice(0, left.indexOf(":")));
-  const rightLine = Number(right.slice(0, right.indexOf(":")));
-  if (leftLine !== rightLine) {
-    return leftLine - rightLine;
-  }
-  if (left < right) {
-    return -1;
-  }
-  if (left > right) {
-    return 1;
-  }
-  return 0;
-}
-
 function appendCounterDiff(
   output: string[],
   title: string,
@@ -132,8 +117,20 @@ function appendCounterDiff(
   right: CheckCounter,
 ): void {
   const rows: string[] = [];
-  for (const key of [...left.keys()].sort(compareCounterKeys)) {
-    const leftCount = left.get(key)!;
+  for (const [key, leftCount] of [...left.entries()].sort((first, second) => {
+    const firstLine = Number(first[0].slice(0, first[0].indexOf(":")));
+    const secondLine = Number(second[0].slice(0, second[0].indexOf(":")));
+    if (firstLine !== secondLine) {
+      return firstLine - secondLine;
+    }
+    if (first[0] < second[0]) {
+      return -1;
+    }
+    if (first[0] > second[0]) {
+      return 1;
+    }
+    return 0;
+  })) {
     let rightCount = right.get(key);
     if (rightCount === undefined) {
       rightCount = 0;

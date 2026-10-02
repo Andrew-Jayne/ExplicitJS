@@ -15,7 +15,7 @@ The suite mirrors the Python `explicit` project's fixture-marker architecture.
 | `config.test.ts` | The two `.explicitrc.json` keys (`format`, `ignore`) driven through the real CLI over a temp project, plus what the file cannot do. |
 | `baselines.test.ts` | Live lint runs must match the committed outputs in `nfo/` at the repo root. |
 | `checks.test.ts`, `svelte.test.ts`, `vue.test.ts` | The older table-driven/unit suites, kept alongside: inline snippets for check edge cases and the SFC extractors. |
-| `markupAttrs.test.ts` | The bare-attribute template scanner (`bool_attr`): directive exemptions and scan hazards (comments, quoted `>`, brace expressions). |
+| `markupAttrs.test.ts` | The template scanner's bare-attribute pass (`bool_attr`): directive exemptions and scan hazards (comments, quoted `>`, brace expressions, a lone `{` in Vue text). Template *expressions* are covered by the `.svelte`/`.vue` fixtures. |
 
 Deno's test runner collects only `*.test.ts` files, so the `test_*` fixtures are
 **never executed or type-checked** — executing them would crash on their calls
@@ -45,7 +45,9 @@ assert(first && second);       // expect: assert, assert, bool_op, bool_op
 - A line with **no** marker must produce **zero** checks.
 - The harness asserts type + count per line, **not** column (column is an
   implementation detail).
-- In `.svelte`/`.vue` fixtures the markers sit inside the script blocks; line
+- In `.svelte`/`.vue` fixtures the markers sit inside the script blocks, or as
+  trailing text on a template line (template text is not code, so a stray
+  `// expect:` there is harmless); line
   numbers refer to the original component file (the analyzer newline-pads
   extracted blocks so they match).
 - In `.tsx` fixtures a marker on a line inside JSX children is technically a
@@ -64,7 +66,9 @@ by comparing live runs against the committed outputs:
   `Total checks found: 0`**; only the file count moves, when sources are
   added or removed.
 - `nfo/tests.out` — the stats summary over the tests tree: exactly the fixture
-  specimens.
+  specimens. Because a summary only pins totals, a separate test also asserts
+  that no file outside `test/fixtures/` has a single finding, naming any stray
+  by file and line — so a harness violation cannot hide inside the counts.
 - `nfo/code_count_*.nfo` — cloc line counts per dir (tracked, not CI-checked;
   up on features, down on cleanup).
 

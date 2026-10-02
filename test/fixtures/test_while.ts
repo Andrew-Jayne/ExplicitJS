@@ -16,3 +16,15 @@ do {
 do {
   drainOne();
 } while (pending === true);
+
+for (let node = head; node; node = node.next) { // expect: while
+  visit(node);
+}
+
+for (let node = head; node !== null; node = node.next) {
+  visit(node);
+}
+
+for (;;) {
+  break;
+}

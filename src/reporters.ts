@@ -19,8 +19,10 @@ const TYPE_COLORS: Record<string, string> = {
   [CheckType.TERNARY]: Colors.CYAN,
   [CheckType.NULLISH_COALESCE]: Colors.CYAN,
   [CheckType.OPTIONAL_CHAIN]: Colors.MAGENTA,
+  [CheckType.NON_NULL]: Colors.MAGENTA,
   [CheckType.OPTIONAL_PARAM]: Colors.MAGENTA,
   [CheckType.BOOL_OP]: Colors.BLUE,
+  [CheckType.NOT]: Colors.YELLOW,
   [CheckType.BOOL_ATTR]: Colors.BLUE,
   [CheckType.ARROW]: Colors.CYAN,
   [CheckType.FILTER]: Colors.BLUE,
@@ -72,97 +74,87 @@ export function formatReport(
 ): string {
   switch (formatType) {
     case ReportFormat.JSON:
-      return formatJson(checks);
-    case ReportFormat.CSV:
-      return formatCsv(checks);
-    case ReportFormat.TEXT:
-      return formatText(checks);
+      return JSON.stringify(
+        checks.map((check) => ({
+          file: check.file,
+          line: check.line,
+          column: check.column,
+          code: check.code,
+          context: check.context,
+          check_type: check.checkType,
+        })),
+        null,
+        2,
+      );
+    case ReportFormat.CSV: {
+      const rows: string[] = ["File,Line,Column,Type,Code,Context"];
+      for (const check of checks) {
+        rows.push(
+          [
+            csvField(check.file),
+            String(check.line),
+            String(check.column),
+            csvField(check.checkType),
+            csvField(check.code),
+            csvField(check.context),
+          ].join(","),
+        );
+      }
+      return `${rows.join("\n")}\n`;
+    }
+    case ReportFormat.TEXT: {
+      if (checks.length === 0) {
+        return Colors.paint(Colors.GREEN, "✓ No style violations found.");
+      }
+
+      const output: string[] = [];
+      output.push(
+        "\n" +
+          Colors.paint(Colors.BOLD + Colors.RED, `Found ${checks.length} style violation(s):`) +
+          "\n",
+      );
+      output.push(Colors.paint(Colors.GRAY, "─".repeat(80)));
+
+      // biome-ignore lint/complexity/noUselessUndefinedInitialization: without the initializer, ExplicitJS's own single-use-var check miscounts this binding's usages.
+      let currentFile: string | undefined = undefined;
+      for (const check of [...checks].sort(sortByFileLine)) {
+        if (check.file !== currentFile) {
+          currentFile = check.file;
+          output.push(`\n${Colors.paint(Colors.BOLD + Colors.BLUE, `📄 ${check.file}`)}`);
+        }
+        output.push(
+          "  " +
+            Colors.paint(Colors.GRAY, "Line ") +
+            Colors.paint(Colors.BOLD, String(check.line)) +
+            Colors.paint(Colors.GRAY, ":") +
+            String(check.column) +
+            " " +
+            Colors.paint(typeColor(check.checkType), `[${check.checkType}]`),
+        );
+        output.push(
+          `    ${Colors.paint(Colors.DIM, "Code:")} ${Colors.paint(Colors.WHITE, check.code)}`,
+        );
+        output.push(`    ${Colors.paint(Colors.DIM, "Context:")} ${check.context}`);
+        output.push("");
+      }
+
+      output.push(Colors.paint(Colors.GRAY, "─".repeat(80)));
+      output.push(`\n${Colors.paint(Colors.BOLD + Colors.CYAN, "📊 Statistics:")}`);
+      const counts = countByType(checks);
+      for (const checkType of [...counts.keys()].sort()) {
+        output.push(
+          "  " +
+            Colors.paint(typeColor(checkType), padEnd(checkType, 20)) +
+            " " +
+            Colors.paint(Colors.BOLD, String(counts.get(checkType))),
+        );
+      }
+
+      return output.join("\n");
+    }
     default:
       throw new Error(`Unknown report format: ${String(formatType)}`);
   }
-}
-
-function formatJson(checks: StyleCheck[]): string {
-  return JSON.stringify(
-    checks.map((check) => ({
-      file: check.file,
-      line: check.line,
-      column: check.column,
-      code: check.code,
-      context: check.context,
-      check_type: check.checkType,
-    })),
-    null,
-    2,
-  );
-}
-
-function formatCsv(checks: StyleCheck[]): string {
-  const rows: string[] = ["File,Line,Column,Type,Code,Context"];
-  for (const check of checks) {
-    rows.push(
-      [
-        csvField(check.file),
-        String(check.line),
-        String(check.column),
-        csvField(check.checkType),
-        csvField(check.code),
-        csvField(check.context),
-      ].join(","),
-    );
-  }
-  return `${rows.join("\n")}\n`;
-}
-
-function formatText(checks: StyleCheck[]): string {
-  if (checks.length === 0) {
-    return Colors.paint(Colors.GREEN, "✓ No style violations found.");
-  }
-
-  const output: string[] = [];
-  output.push(
-    "\n" +
-      Colors.paint(Colors.BOLD + Colors.RED, `Found ${checks.length} style violation(s):`) +
-      "\n",
-  );
-  output.push(Colors.paint(Colors.GRAY, "─".repeat(80)));
-
-  // biome-ignore lint/complexity/noUselessUndefinedInitialization: without the initializer, ExplicitJS's own single-use-var check miscounts this binding's usages.
-  let currentFile: string | undefined = undefined;
-  for (const check of [...checks].sort(sortByFileLine)) {
-    if (check.file !== currentFile) {
-      currentFile = check.file;
-      output.push(`\n${Colors.paint(Colors.BOLD + Colors.BLUE, `📄 ${check.file}`)}`);
-    }
-    output.push(
-      "  " +
-        Colors.paint(Colors.GRAY, "Line ") +
-        Colors.paint(Colors.BOLD, String(check.line)) +
-        Colors.paint(Colors.GRAY, ":") +
-        String(check.column) +
-        " " +
-        Colors.paint(typeColor(check.checkType), `[${check.checkType}]`),
-    );
-    output.push(
-      `    ${Colors.paint(Colors.DIM, "Code:")} ${Colors.paint(Colors.WHITE, check.code)}`,
-    );
-    output.push(`    ${Colors.paint(Colors.DIM, "Context:")} ${check.context}`);
-    output.push("");
-  }
-
-  output.push(Colors.paint(Colors.GRAY, "─".repeat(80)));
-  output.push(`\n${Colors.paint(Colors.BOLD + Colors.CYAN, "📊 Statistics:")}`);
-  const counts = countByType(checks);
-  for (const checkType of [...counts.keys()].sort()) {
-    output.push(
-      "  " +
-        Colors.paint(typeColor(checkType), padEnd(checkType, 20)) +
-        " " +
-        Colors.paint(Colors.BOLD, String(counts.get(checkType))),
-    );
-  }
-
-  return output.join("\n");
 }
 
 export function generateStatisticsReport(checks: StyleCheck[], fileCount: number): string {

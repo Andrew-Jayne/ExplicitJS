@@ -8,17 +8,24 @@
  * nearest enclosing binding, so uses inside nested closures count toward the
  * variable they actually capture instead of vanishing at the scope boundary.
  *
- * A definition is flagged only when it has exactly one read in its own scope
+ * A variable is flagged only when it has exactly one read in its own scope
  * and none from nested scopes. A reference inside a nested function (or a
  * deferred class-member initializer) needs the shared binding — inlining would
- * change capture or evaluation-order semantics — so such definitions are
- * exempt rather than counted as extra uses.
+ * change capture or evaluation-order semantics — so such variables are exempt
+ * rather than counted as extra uses. Functions (declarations, and
+ * function-valued bindings never reassigned) have no such semantics: one call
+ * from any scope makes them single-use.
  *
  * Exemptions, mirroring the Python tool:
  *   - UPPER_SNAKE_CASE constants are never flagged as single-use vars.
  *   - Exported names (the module's public surface) and `package.json` `bin`
  *     entry points are never flagged as single-use functions, since references
  *     from outside the file are invisible to a single-file analysis.
+ *
+ * A single-name destructure (`const { profile } = user`) counts as a
+ * definition like `const profile = ...`; patterns binding several names, or
+ * using a rest or default, have no single inlining and are skipped. A no-op
+ * statement (`value;`, `void value;`) is not a read.
  *
  * One deliberate divergence from Python: a function (or function-valued
  * variable) whose sole read passes it BY REFERENCE — `memo(Component)`,
@@ -33,6 +40,9 @@ import { CheckType, type StyleCheck } from "./constructs.ts";
 
 const EXCLUDED_NAMES: ReadonlySet<string> = new Set(["_"]);
 
+// `helper.call(...)` / `helper.apply(...)` invoke the function on the spot.
+const INVOKING_METHODS: ReadonlySet<string> = new Set(["call", "apply"]);
+
 interface Position {
   line: number;
   column: number;
@@ -46,12 +56,15 @@ interface PendingWrite {
 interface PendingRead {
   name: string;
   isCall: boolean;
+  at: Position;
 }
 
 interface Scope {
   parent: Scope | undefined;
   isClass: boolean;
   declared: Set<string>;
+  importedNames: Set<string>;
+  discardReadAt: Position | null;
   varDefs: Map<string, Position[]>;
   funcDefs: Map<string, Position[]>;
   funcValuedVars: Set<string>;
@@ -59,35 +72,203 @@ interface Scope {
   writes: PendingWrite[];
   ownReads: Map<string, number>;
   nestedReads: Map<string, number>;
-  ownBareReads: Map<string, number>;
+  bareReads: Map<string, number>;
 }
 
 interface ScopeContext {
   filename: string;
   sourceFile: ts.SourceFile;
   results: StyleCheck[];
-  exportedNames: ReadonlySet<string>;
+  exportedNames: Set<string>;
   scopes: Scope[];
 }
 
-export function findSingleUse(sourceFile: ts.SourceFile, filename: string): StyleCheck[] {
+export function findSingleUse(
+  sourceFile: ts.SourceFile,
+  filename: string,
+  templateReads: ReadonlySet<string>,
+): StyleCheck[] {
   const ctx: ScopeContext = {
     filename,
     sourceFile,
     results: [],
-    exportedNames: collectExportedNames(sourceFile),
+    // Names a component's template reads are used where this script cannot
+    // see, exactly like exports, so they share the exemption.
+    exportedNames: new Set(templateReads),
     scopes: [],
   };
+
+  // --- exports --------------------------------------------------------------
+  // The module's public surface: references from outside the file are
+  // invisible to a single-file analysis, so these names are never flagged.
+  for (const statement of sourceFile.statements) {
+    let hasExportKeyword = false;
+    if (ts.canHaveModifiers(statement) === true) {
+      const modifiers = ts.getModifiers(statement);
+      if (modifiers !== undefined) {
+        for (const modifier of modifiers) {
+          if (modifier.kind === ts.SyntaxKind.ExportKeyword) {
+            hasExportKeyword = true;
+          }
+        }
+      }
+    }
+    if (hasExportKeyword === true) {
+      if (ts.isFunctionDeclaration(statement) === true && statement.name !== undefined) {
+        ctx.exportedNames.add(statement.name.text);
+      } else if (isClassLike(statement) === true && statement.name !== undefined) {
+        ctx.exportedNames.add(statement.name.text);
+      } else if (ts.isVariableStatement(statement) === true) {
+        for (const declaration of statement.declarationList.declarations) {
+          if (ts.isIdentifier(declaration.name) === true) {
+            ctx.exportedNames.add(declaration.name.text);
+          }
+        }
+      }
+    }
+
+    if (ts.isExportDeclaration(statement) === true && statement.exportClause !== undefined) {
+      if (ts.isNamedExports(statement.exportClause) === true) {
+        for (const element of statement.exportClause.elements) {
+          if (element.propertyName !== undefined) {
+            ctx.exportedNames.add(element.propertyName.text);
+          }
+          ctx.exportedNames.add(element.name.text);
+        }
+      }
+    }
+
+    if (
+      ts.isExportAssignment(statement) === true &&
+      ts.isIdentifier(statement.expression) === true
+    ) {
+      ctx.exportedNames.add(statement.expression.text);
+    }
+  }
 
   // The SourceFile node itself seeds the walk: its children are the top-level
   // statements, so the default traversal collects them into the module scope.
   collect(sourceFile, createScope(undefined, false, ctx), ctx);
 
-  resolveWrites(ctx.scopes);
-  resolveReads(ctx.scopes);
+  // --- reference resolution -------------------------------------------------
+  // Every write resolves before any read, so reads see the complete bindings.
+  for (const scope of ctx.scopes) {
+    for (const write of scope.writes) {
+      let target = findDeclaringScope(scope, write.name);
+      if (target === undefined) {
+        target = scope;
+      }
+      target.declared.add(write.name);
+      record(target.varDefs, write.name, write.at);
+    }
+  }
 
   for (const scope of ctx.scopes) {
-    flagScope(scope, ctx);
+    for (const read of scope.reads) {
+      const target = findDeclaringScope(scope, read.name);
+      if (target === undefined) {
+        continue;
+      }
+      // `_` is the conventional discard name, so both single-letter and
+      // single-use skip it; reading it back makes it a real variable hiding
+      // behind that pass. An imported `_` (lodash) is a library namespace,
+      // not a discard.
+      if (
+        read.name === "_" &&
+        target.importedNames.has("_") === false &&
+        target.discardReadAt === null
+      ) {
+        target.discardReadAt = read.at;
+      }
+      if (read.isCall === false) {
+        bump(target.bareReads, read.name);
+      }
+      if (target === scope) {
+        bump(target.ownReads, read.name);
+      } else {
+        bump(target.nestedReads, read.name);
+      }
+    }
+  }
+
+  // --- flagging -------------------------------------------------------------
+  for (const scope of ctx.scopes) {
+    if (scope.discardReadAt !== null) {
+      ctx.results.push({
+        file: ctx.filename,
+        line: scope.discardReadAt.line,
+        column: scope.discardReadAt.column,
+        code: "_",
+        context:
+          "'_' marks a discarded value, but it is read here - give the variable a descriptive name",
+        checkType: CheckType.SINGLE_LETTER_VAR,
+      });
+    }
+    if (scope.isClass === true) {
+      continue;
+    }
+
+    for (const [name, positions] of scope.varDefs) {
+      if (EXCLUDED_NAMES.has(name) === true || isDunder(name) === true) {
+        continue;
+      }
+      // UPPER_SNAKE_CASE (with at least one letter) marks a deliberate constant.
+      if (name === name.toUpperCase() && /[a-zA-Z]/.test(name) === true) {
+        continue;
+      }
+      if (ctx.exportedNames.has(name) === true) {
+        continue;
+      }
+      let flaggable = false;
+      if (scope.funcValuedVars.has(name) === true) {
+        // A function-valued binding gets the function rule: read by reference
+        // it is exempt (inlining would create the anonymous expression this
+        // tool discourages), and one call from any scope makes it single-use.
+        flaggable = isCalledOnce(scope, name, positions);
+      } else {
+        // A read from a nested scope needs the shared binding: inlining would
+        // change capture or evaluation-order semantics, so the definition is
+        // exempt. Counts start at 1, so an absent entry means zero nested reads.
+        flaggable =
+          positions.length === 1 &&
+          scope.ownReads.get(name) === 1 &&
+          scope.nestedReads.get(name) === undefined;
+      }
+      if (flaggable === true) {
+        const at = positions[0]!;
+        ctx.results.push({
+          file: ctx.filename,
+          line: at.line,
+          column: at.column,
+          code: name,
+          context: `Variable '${name}' is only used once, consider inlining the expression or declare it in UPPER_SNAKE_CASE to mark as a deliberate constant`,
+          checkType: CheckType.SINGLE_USE_VAR,
+        });
+      }
+    }
+
+    for (const [name, positions] of scope.funcDefs) {
+      if (isDunder(name) === true) {
+        continue;
+      }
+      if (ctx.exportedNames.has(name) === true) {
+        continue;
+      }
+      // A reference read — `memo(Component)`, `items.map(helper)`, a JSX tag —
+      // passes the function by name, which is exactly what this tool asks for
+      // instead of an anonymous expression; only a call read (`helper()`) flags.
+      if (isCalledOnce(scope, name, positions) === true) {
+        const at = positions[0]!;
+        ctx.results.push({
+          file: ctx.filename,
+          line: at.line,
+          column: at.column,
+          code: `function ${name}(...)`,
+          context: `Function '${name}' is only used once - consider inlining at the call site`,
+          checkType: CheckType.SINGLE_USE_FUNC,
+        });
+      }
+    }
   }
   return ctx.results;
 }
@@ -115,6 +296,8 @@ function createScope(parent: Scope | undefined, isClass: boolean, ctx: ScopeCont
     parent,
     isClass,
     declared: new Set(),
+    importedNames: new Set(),
+    discardReadAt: null,
     varDefs: new Map(),
     funcDefs: new Map(),
     funcValuedVars: new Set(),
@@ -122,7 +305,7 @@ function createScope(parent: Scope | undefined, isClass: boolean, ctx: ScopeCont
     writes: [],
     ownReads: new Map(),
     nestedReads: new Map(),
-    ownBareReads: new Map(),
+    bareReads: new Map(),
   };
   ctx.scopes.push(scope);
   return scope;
@@ -148,7 +331,24 @@ function collect(node: ts.Node, scope: Scope, ctx: ScopeContext): void {
   }
 
   if (isClassLike(node) === true) {
-    collectClass(node, scope, ctx);
+    // `extends` clauses evaluate immediately, in the enclosing scope.
+    if (node.heritageClauses !== undefined) {
+      for (const clause of node.heritageClauses) {
+        collect(clause, scope, ctx);
+      }
+    }
+
+    const classScope = createScope(scope, true, ctx);
+    if (node.name !== undefined) {
+      if (ts.isClassExpression(node) === true) {
+        classScope.declared.add(node.name.text);
+      } else {
+        scope.declared.add(node.name.text);
+      }
+    }
+    for (const member of node.members) {
+      collect(member, classScope, ctx);
+    }
     return;
   }
 
@@ -165,6 +365,16 @@ function collect(node: ts.Node, scope: Scope, ctx: ScopeContext): void {
         ts.isFunctionExpression(node.initializer) === true
       ) {
         scope.funcValuedVars.add(node.name.text);
+      }
+    } else if (ts.isIdentifier(node.name) === false && node.initializer !== undefined) {
+      // `const { profile } = user` is `user.profile` with a detour; a pattern
+      // binding several names (or a rest/default) has no single inlining.
+      const names: ts.Identifier[] = [];
+      if (collectPatternNames(node.name, names) === true && names.length === 1) {
+        const sole = names[0]!;
+        if (EXCLUDED_NAMES.has(sole.text) === false) {
+          record(scope.varDefs, sole.text, position(sole, ctx.sourceFile));
+        }
       }
     }
     ts.forEachChild(node, (child) => collect(child, scope, ctx));
@@ -200,7 +410,27 @@ function collect(node: ts.Node, scope: Scope, ctx: ScopeContext): void {
   }
 
   if (ts.isImportDeclaration(node) === true) {
-    declareImports(node, scope);
+    const clause = node.importClause;
+    if (clause !== undefined) {
+      const names: string[] = [];
+      if (clause.name !== undefined) {
+        names.push(clause.name.text);
+      }
+      const bindings = clause.namedBindings;
+      if (bindings !== undefined) {
+        if (ts.isNamespaceImport(bindings) === true) {
+          names.push(bindings.name.text);
+        } else {
+          for (const element of bindings.elements) {
+            names.push(element.name.text);
+          }
+        }
+      }
+      for (const name of names) {
+        scope.declared.add(name);
+        scope.importedNames.add(name);
+      }
+    }
     return;
   }
 
@@ -220,9 +450,120 @@ function collect(node: ts.Node, scope: Scope, ctx: ScopeContext): void {
     return;
   }
 
+  // `result;` / `void result;` does nothing but pad a variable's read count.
+  if (ts.isExpressionStatement(node) === true) {
+    let subject = node.expression;
+    while (
+      ts.isParenthesizedExpression(subject) === true ||
+      ts.isVoidExpression(subject) === true
+    ) {
+      subject = subject.expression;
+    }
+    if (ts.isIdentifier(subject) === true) {
+      return;
+    }
+  }
+
   if (ts.isIdentifier(node) === true) {
-    if (isReadReference(node) === true) {
-      scope.reads.push({ name: node.text, isCall: isCallCallee(node) });
+    const parent = node.parent;
+    let isRead = true;
+    if (parent !== undefined) {
+      // `obj.name` — the property name is not a variable reference.
+      if (ts.isPropertyAccessExpression(parent) === true && parent.name === node) {
+        isRead = false;
+      }
+      // `<Widget value={x}/>` — the attribute name is not a variable reference.
+      if (ts.isJsxAttribute(parent) === true && parent.name === node) {
+        isRead = false;
+      }
+      // `<svg xlink:href={x}/>` — neither half of a namespaced name is one.
+      if (ts.isJsxNamespacedName(parent) === true) {
+        isRead = false;
+      }
+      if (ts.isQualifiedName(parent) === true && parent.right === node) {
+        isRead = false;
+      }
+      // Object literal key: `{ name: value }` (but `{ name }` shorthand IS a ref).
+      if (ts.isPropertyAssignment(parent) === true && parent.name === node) {
+        isRead = false;
+      }
+      // Type-member names (`user: { profile: Profile }`) name fields, not values.
+      if (
+        (ts.isPropertySignature(parent) === true || ts.isMethodSignature(parent) === true) &&
+        parent.name === node
+      ) {
+        isRead = false;
+      }
+      // The name side of a declaration is a write, not a read.
+      if (
+        (ts.isVariableDeclaration(parent) === true ||
+          ts.isFunctionDeclaration(parent) === true ||
+          isClassLike(parent) === true ||
+          ts.isParameter(parent) === true ||
+          ts.isBindingElement(parent) === true ||
+          ts.isMethodDeclaration(parent) === true ||
+          ts.isPropertyDeclaration(parent) === true ||
+          ts.isGetAccessorDeclaration(parent) === true ||
+          ts.isSetAccessorDeclaration(parent) === true ||
+          ts.isImportSpecifier(parent) === true ||
+          ts.isTypeParameterDeclaration(parent) === true) &&
+        parent.name === node
+      ) {
+        isRead = false;
+      }
+      // Left-hand side of a plain assignment is the def, not a read.
+      if (
+        ts.isBinaryExpression(parent) === true &&
+        parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+        parent.left === node
+      ) {
+        isRead = false;
+      }
+      // Labels name statements, not values.
+      if (ts.isLabeledStatement(parent) === true && parent.label === node) {
+        isRead = false;
+      }
+      if (ts.isBreakOrContinueStatement(parent) === true && parent.label === node) {
+        isRead = false;
+      }
+    }
+
+    if (isRead === true) {
+      // A call read means the identifier is invoked rather than passed along:
+      // `helper()`, and the same call spelled `(helper)()`,
+      // `helper.call(...)` / `helper.apply(...)`, ``helper`...` ``, or
+      // `new Helper()`.
+      let callee: ts.Node = node;
+      while (callee.parent !== undefined && ts.isParenthesizedExpression(callee.parent) === true) {
+        callee = callee.parent;
+      }
+      const calleeParent = callee.parent;
+      let isCall = false;
+      if (calleeParent !== undefined) {
+        if (
+          ts.isCallExpression(calleeParent) === true ||
+          ts.isNewExpression(calleeParent) === true
+        ) {
+          isCall = calleeParent.expression === callee;
+        } else if (ts.isTaggedTemplateExpression(calleeParent) === true) {
+          isCall = calleeParent.tag === callee;
+        } else if (
+          ts.isPropertyAccessExpression(calleeParent) === true &&
+          calleeParent.expression === callee &&
+          INVOKING_METHODS.has(calleeParent.name.text) === true
+        ) {
+          const grandparent = calleeParent.parent;
+          isCall =
+            grandparent !== undefined &&
+            ts.isCallExpression(grandparent) === true &&
+            grandparent.expression === calleeParent;
+        }
+      }
+      scope.reads.push({
+        name: node.text,
+        isCall,
+        at: position(node, ctx.sourceFile),
+      });
     }
     return;
   }
@@ -266,27 +607,6 @@ function collectFunctionLike(
   }
 }
 
-function collectClass(node: ts.ClassLikeDeclaration, parentScope: Scope, ctx: ScopeContext): void {
-  // `extends` clauses evaluate immediately, in the enclosing scope.
-  if (node.heritageClauses !== undefined) {
-    for (const clause of node.heritageClauses) {
-      collect(clause, parentScope, ctx);
-    }
-  }
-
-  const scope = createScope(parentScope, true, ctx);
-  if (node.name !== undefined) {
-    if (ts.isClassExpression(node) === true) {
-      scope.declared.add(node.name.text);
-    } else {
-      parentScope.declared.add(node.name.text);
-    }
-  }
-  for (const member of node.members) {
-    collect(member, scope, ctx);
-  }
-}
-
 function declareBindingName(name: ts.BindingName, scope: Scope): void {
   if (ts.isIdentifier(name) === true) {
     scope.declared.add(name.text);
@@ -299,25 +619,22 @@ function declareBindingName(name: ts.BindingName, scope: Scope): void {
   }
 }
 
-function declareImports(node: ts.ImportDeclaration, scope: Scope): void {
-  const clause = node.importClause;
-  if (clause === undefined) {
-    return;
-  }
-  if (clause.name !== undefined) {
-    scope.declared.add(clause.name.text);
-  }
-  const bindings = clause.namedBindings;
-  if (bindings === undefined) {
-    return;
-  }
-  if (ts.isNamespaceImport(bindings) === true) {
-    scope.declared.add(bindings.name.text);
-  } else {
-    for (const element of bindings.elements) {
-      scope.declared.add(element.name.text);
+/** Gathers a pattern's bound names; false when a rest or default element rules out inlining. */
+function collectPatternNames(pattern: ts.BindingPattern, out: ts.Identifier[]): boolean {
+  for (const element of pattern.elements) {
+    if (ts.isBindingElement(element) === false) {
+      continue;
+    }
+    if (element.dotDotDotToken !== undefined || element.initializer !== undefined) {
+      return false;
+    }
+    if (ts.isIdentifier(element.name) === true) {
+      out.push(element.name);
+    } else if (collectPatternNames(element.name, out) === false) {
+      return false;
     }
   }
+  return true;
 }
 
 // --- reference resolution ---------------------------------------------------
@@ -333,267 +650,27 @@ function findDeclaringScope(scope: Scope, name: string): Scope | undefined {
   return undefined;
 }
 
-function resolveWrites(scopes: readonly Scope[]): void {
-  for (const scope of scopes) {
-    for (const write of scope.writes) {
-      let target = findDeclaringScope(scope, write.name);
-      if (target === undefined) {
-        target = scope;
-      }
-      target.declared.add(write.name);
-      record(target.varDefs, write.name, write.at);
-    }
-  }
-}
-
-function resolveReads(scopes: readonly Scope[]): void {
-  for (const scope of scopes) {
-    for (const read of scope.reads) {
-      const target = findDeclaringScope(scope, read.name);
-      if (target === undefined) {
-        continue;
-      }
-      if (target === scope) {
-        bump(target.ownReads, read.name);
-        if (read.isCall === false) {
-          bump(target.ownBareReads, read.name);
-        }
-      } else {
-        bump(target.nestedReads, read.name);
-      }
-    }
-  }
-}
-
-function isCallCallee(id: ts.Identifier): boolean {
-  const parent = id.parent;
-  if (parent === undefined) {
-    return false;
-  }
-  return ts.isCallExpression(parent) === true && parent.expression === id;
-}
-
-function isReadReference(id: ts.Identifier): boolean {
-  const parent = id.parent;
-  if (parent === undefined) {
-    return true;
-  }
-
-  // `obj.name` — the property name is not a variable reference.
-  if (ts.isPropertyAccessExpression(parent) === true && parent.name === id) {
-    return false;
-  }
-  // `<Widget value={x}/>` — the attribute name is not a variable reference.
-  if (ts.isJsxAttribute(parent) === true && parent.name === id) {
-    return false;
-  }
-  // `<svg xlink:href={x}/>` — neither half of a namespaced name is one.
-  if (ts.isJsxNamespacedName(parent) === true) {
-    return false;
-  }
-  if (ts.isQualifiedName(parent) === true && parent.right === id) {
-    return false;
-  }
-  // Object literal key: `{ name: value }` (but `{ name }` shorthand IS a ref).
-  if (ts.isPropertyAssignment(parent) === true && parent.name === id) {
-    return false;
-  }
-  // The name side of a declaration is a write, not a read.
-  if (isDeclarationName(parent, id) === true) {
-    return false;
-  }
-  // Left-hand side of a plain assignment is the def, not a read.
-  if (
-    ts.isBinaryExpression(parent) === true &&
-    parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-    parent.left === id
-  ) {
-    return false;
-  }
-  // Labels name statements, not values.
-  if (ts.isLabeledStatement(parent) === true && parent.label === id) {
-    return false;
-  }
-  if (ts.isBreakOrContinueStatement(parent) === true && parent.label === id) {
-    return false;
-  }
-
-  return true;
-}
-
-type NamedMemberDeclaration =
-  | ts.MethodDeclaration
-  | ts.PropertyDeclaration
-  | ts.GetAccessorDeclaration
-  | ts.SetAccessorDeclaration;
-
-function isNamedMemberDeclaration(node: ts.Node): node is NamedMemberDeclaration {
-  return (
-    ts.isMethodDeclaration(node) === true ||
-    ts.isPropertyDeclaration(node) === true ||
-    ts.isGetAccessorDeclaration(node) === true ||
-    ts.isSetAccessorDeclaration(node) === true
-  );
-}
-
-function isDeclarationName(parent: ts.Node, id: ts.Identifier): boolean {
-  if (ts.isVariableDeclaration(parent) === true && parent.name === id) {
-    return true;
-  }
-  if (ts.isFunctionDeclaration(parent) === true && parent.name === id) {
-    return true;
-  }
-  if (isClassLike(parent) === true && parent.name === id) {
-    return true;
-  }
-  if (ts.isParameter(parent) === true && parent.name === id) {
-    return true;
-  }
-  if (ts.isBindingElement(parent) === true && parent.name === id) {
-    return true;
-  }
-  if (isNamedMemberDeclaration(parent) === true && parent.name === id) {
-    return true;
-  }
-  if (ts.isImportSpecifier(parent) === true && parent.name === id) {
-    return true;
-  }
-  if (ts.isTypeParameterDeclaration(parent) === true && parent.name === id) {
-    return true;
-  }
-  return false;
-}
-
 // --- flagging ---------------------------------------------------------------
 
-function isFlaggableSingleUse(scope: Scope, name: string, positions: Position[]): boolean {
-  if (positions.length !== 1) {
+/**
+ * A function is single-use when it is called exactly once from anywhere: a
+ * module-level helper whose one call sits inside another function is the
+ * canonical case. Unlike a variable, a function binding that is never
+ * reassigned has no capture or evaluation-order semantics to preserve, so a
+ * nested call counts as the use rather than exempting it.
+ */
+function isCalledOnce(scope: Scope, name: string, positions: Position[]): boolean {
+  if (positions.length !== 1 || scope.bareReads.get(name) !== undefined) {
     return false;
   }
-  if (scope.ownReads.get(name) !== 1) {
-    return false;
-  }
-  // A read from a nested scope needs the shared binding: inlining would change
-  // capture or evaluation-order semantics, so the definition is exempt. Counts
-  // start at 1, so an absent entry means zero nested reads.
-  return scope.nestedReads.get(name) === undefined;
-}
-
-function flagScope(scope: Scope, ctx: ScopeContext): void {
-  if (scope.isClass === true) {
-    return;
-  }
-
-  for (const [name, positions] of scope.varDefs) {
-    if (EXCLUDED_NAMES.has(name) === true || isDunder(name) === true) {
-      continue;
-    }
-    if (isConstant(name) === true) {
-      continue;
-    }
-    if (ctx.exportedNames.has(name) === true) {
-      continue;
-    }
-    // A function-valued binding read by reference gets the function rule:
-    // inlining it would create the anonymous expression this tool discourages.
-    if (scope.funcValuedVars.has(name) === true && scope.ownBareReads.get(name) !== undefined) {
-      continue;
-    }
-    if (isFlaggableSingleUse(scope, name, positions) === true) {
-      const at = positions[0]!;
-      ctx.results.push({
-        file: ctx.filename,
-        line: at.line,
-        column: at.column,
-        code: name,
-        context: `Variable '${name}' is only used once, consider inlining the expression or declare it in UPPER_SNAKE_CASE to mark as a deliberate constant`,
-        checkType: CheckType.SINGLE_USE_VAR,
-      });
+  let reads = 0;
+  for (const counter of [scope.ownReads, scope.nestedReads]) {
+    const count = counter.get(name);
+    if (count !== undefined) {
+      reads += count;
     }
   }
-
-  for (const [name, positions] of scope.funcDefs) {
-    if (isDunder(name) === true) {
-      continue;
-    }
-    if (ctx.exportedNames.has(name) === true) {
-      continue;
-    }
-    // A reference read — `memo(Component)`, `items.map(helper)`, a JSX tag —
-    // passes the function by name, which is exactly what this tool asks for
-    // instead of an anonymous expression; only a call read (`helper()`) flags.
-    if (scope.ownBareReads.get(name) !== undefined) {
-      continue;
-    }
-    if (isFlaggableSingleUse(scope, name, positions) === true) {
-      const at = positions[0]!;
-      ctx.results.push({
-        file: ctx.filename,
-        line: at.line,
-        column: at.column,
-        code: `function ${name}(...)`,
-        context: `Function '${name}' is only used once - consider inlining at the call site`,
-        checkType: CheckType.SINGLE_USE_FUNC,
-      });
-    }
-  }
-}
-
-// --- exports ----------------------------------------------------------------
-
-function collectExportedNames(sourceFile: ts.SourceFile): ReadonlySet<string> {
-  const names = new Set<string>();
-  for (const statement of sourceFile.statements) {
-    collectExportsFromStatement(statement, names);
-  }
-  return names;
-}
-
-function hasExportKeyword(statement: ts.Statement): boolean {
-  if (ts.canHaveModifiers(statement) === false) {
-    return false;
-  }
-  const modifiers = ts.getModifiers(statement);
-  if (modifiers === undefined) {
-    return false;
-  }
-  for (const modifier of modifiers) {
-    if (modifier.kind === ts.SyntaxKind.ExportKeyword) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function collectExportsFromStatement(statement: ts.Statement, names: Set<string>): void {
-  if (hasExportKeyword(statement) === true) {
-    if (ts.isFunctionDeclaration(statement) === true && statement.name !== undefined) {
-      names.add(statement.name.text);
-    } else if (isClassLike(statement) === true && statement.name !== undefined) {
-      names.add(statement.name.text);
-    } else if (ts.isVariableStatement(statement) === true) {
-      for (const declaration of statement.declarationList.declarations) {
-        if (ts.isIdentifier(declaration.name) === true) {
-          names.add(declaration.name.text);
-        }
-      }
-    }
-  }
-
-  if (ts.isExportDeclaration(statement) === true && statement.exportClause !== undefined) {
-    if (ts.isNamedExports(statement.exportClause) === true) {
-      for (const element of statement.exportClause.elements) {
-        if (element.propertyName !== undefined) {
-          names.add(element.propertyName.text);
-        }
-        names.add(element.name.text);
-      }
-    }
-  }
-
-  if (ts.isExportAssignment(statement) === true && ts.isIdentifier(statement.expression) === true) {
-    names.add(statement.expression.text);
-  }
+  return reads === 1;
 }
 
 // --- helpers ----------------------------------------------------------------
@@ -623,12 +700,4 @@ function position(node: ts.Node, sourceFile: ts.SourceFile): Position {
 
 function isDunder(name: string): boolean {
   return name.length > 4 && name.startsWith("__") === true && name.endsWith("__") === true;
-}
-
-function hasLetter(name: string): boolean {
-  return /[a-zA-Z]/.test(name);
-}
-
-function isConstant(name: string): boolean {
-  return name === name.toUpperCase() && hasLetter(name) === true;
 }

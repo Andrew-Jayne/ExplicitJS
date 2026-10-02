@@ -114,13 +114,13 @@ Deno.test("analyze: checks fire inside svelte scripts with original lines", () =
   assertEquals(checkAt(checks, 0).line, 3);
 });
 
-Deno.test("analyze: template is not analyzed", () => {
+Deno.test("analyze: template conditions are checked like script ones", () => {
   assertEquals(
     analyzeSource(
-      "<script>\nif (items) {}\n</script>\n{#if visible}<div>{value}</div>{/if}\n",
+      "<script>\nif (items) {}\n</script>\n{#if visible}<div>{value}</div>{/if}\n{#if count > 0}<p>{count}</p>{/if}\n",
       "case.svelte",
-    ).length,
-    1,
+    ).map((check) => `${check.line}:${check.checkType}`),
+    ["2:if", "4:if"],
   );
 });
 

@@ -50,13 +50,6 @@ export function helpText(): string {
   return HELP_TEXT;
 }
 
-function requireValue(flag: string, value: string | undefined): string {
-  if (value === undefined) {
-    throw new ArgError(`Option ${flag} requires a value`);
-  }
-  return value;
-}
-
 export function parseArgs(argv: readonly string[]): Args {
   const args: Args = {
     path: null,
@@ -88,7 +81,11 @@ export function parseArgs(argv: readonly string[]): Args {
         return inlineValue;
       }
       index += 1;
-      return requireValue(flag, argv[index - 1]);
+      const value = argv[index - 1];
+      if (value === undefined) {
+        throw new ArgError(`Option ${flag} requires a value`);
+      }
+      return value;
     };
 
     switch (flag) {

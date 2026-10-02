@@ -14,125 +14,80 @@ export interface Config {
   ignorePaths: Set<string>;
 }
 
-function emptyConfig(): Config {
-  return { format: null, ignoreNames: new Set(), ignorePaths: new Set() };
-}
-
-function directoryOf(start: string): string {
-  if (existsSync(start) === true && statSync(start).isFile() === true) {
-    return path.dirname(path.resolve(start));
-  }
-  return path.resolve(start);
-}
-
-function findUp(start: string, filename: string): string | undefined {
-  let current = directoryOf(start);
-  for (;;) {
-    const candidate = path.join(current, filename);
-    if (existsSync(candidate) === true && statSync(candidate).isFile() === true) {
-      return candidate;
-    }
-    const parent = path.dirname(current);
-    if (parent === current) {
-      return undefined;
-    }
-    current = parent;
-  }
-}
-
-export function loadConfig(start: string, configPath: string | null = null): Config {
-  const config = emptyConfig();
-
-  if (configPath !== null) {
-    applyRcFile(configPath, config);
-    return config;
-  }
-
-  const rcPath = findUp(start, ".explicitrc.json");
-  if (rcPath !== undefined) {
-    applyRcFile(rcPath, config);
-  }
-
-  return config;
-}
-
-function readJson(filepath: string): Record<string, unknown> | null {
-  try {
-    const parsed: unknown = JSON.parse(readFileSync(filepath, "utf-8"));
-    if (typeof parsed === "object" && parsed !== null) {
-      return parsed as Record<string, unknown>;
-    }
-  } catch {
-    return null;
+function lookup(table: Record<string, unknown>, key: string): unknown {
+  if (key in table) {
+    return table[key];
   }
   return null;
 }
 
-function applyRcFile(filepath: string, config: Config): void {
-  const data = readJson(filepath);
-  if (data === null) {
-    return;
-  }
-  applyTable(data, config, path.dirname(path.resolve(filepath)));
-}
+export function loadConfig(start: string, configPath: string | null = null): Config {
+  const config: Config = { format: null, ignoreNames: new Set(), ignorePaths: new Set() };
 
-/**
- * Apply one config table. `baseDir` is the directory holding the config file:
- * an `ignore` entry with a separator in it is a path relative to that file, so
- * it means the same directory wherever the tool is invoked from. Unknown keys
- * are ignored, which includes the output flags (`--stats-only`, `--no-color`)
- * and anything that looks like a check name.
- */
-function applyTable(table: Record<string, unknown>, config: Config, baseDir: string): void {
-  const format = lookupString(table, "format");
-  if (format !== null && isReportFormat(format) === true) {
+  let rcPath = configPath;
+  if (rcPath === null) {
+    // Walk up from the analyzed path (its directory, when it is a file) to the
+    // filesystem root, stopping at the first `.explicitrc.json`.
+    let current = path.resolve(start);
+    if (existsSync(start) === true && statSync(start).isFile() === true) {
+      current = path.dirname(path.resolve(start));
+    }
+    for (;;) {
+      const candidate = path.join(current, ".explicitrc.json");
+      if (existsSync(candidate) === true && statSync(candidate).isFile() === true) {
+        rcPath = candidate;
+        break;
+      }
+      const parent = path.dirname(current);
+      if (parent === current) {
+        break;
+      }
+      current = parent;
+    }
+  }
+  if (rcPath === null) {
+    return config;
+  }
+
+  let table: Record<string, unknown> | null = null;
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(rcPath, "utf-8"));
+    if (typeof parsed === "object" && parsed !== null) {
+      table = parsed as Record<string, unknown>;
+    }
+  } catch {
+    table = null;
+  }
+  if (table === null) {
+    return config;
+  }
+
+  // Unknown keys are ignored, which includes the output flags (`--stats-only`,
+  // `--no-color`) and anything that looks like a check name.
+  const format = lookup(table, "format");
+  if (typeof format === "string" && isReportFormat(format) === true) {
     config.format = format;
   }
 
-  const ignore = lookupArray(table, "ignore");
-  if (ignore === null) {
-    return;
+  const ignore = lookup(table, "ignore");
+  if (Array.isArray(ignore) === false) {
+    return config;
   }
-  for (const entry of ignore) {
+  for (const entry of ignore as unknown[]) {
+    if (typeof entry !== "string") {
+      continue;
+    }
     const trimmed = entry.trim();
     if (trimmed === "") {
       continue;
     }
+    // An entry with a separator is a path relative to the config file, so it
+    // means the same directory wherever the tool is invoked from.
     if (trimmed.includes("/") === true || trimmed.includes("\\") === true) {
-      config.ignorePaths.add(path.resolve(baseDir, trimmed));
+      config.ignorePaths.add(path.resolve(path.dirname(path.resolve(rcPath)), trimmed));
     } else {
       config.ignoreNames.add(trimmed);
     }
   }
-}
-
-function lookup(table: Record<string, unknown>, ...keys: string[]): unknown {
-  for (const key of keys) {
-    if (key in table) {
-      return table[key];
-    }
-  }
-  return null;
-}
-
-function lookupString(table: Record<string, unknown>, ...keys: string[]): string | null {
-  const value = lookup(table, ...keys);
-  if (typeof value === "string") {
-    return value;
-  }
-  return null;
-}
-
-function lookupArray(table: Record<string, unknown>, ...keys: string[]): string[] | null {
-  const value = lookup(table, ...keys);
-  if (Array.isArray(value) === false) {
-    return null;
-  }
-  const items: string[] = [];
-  for (const item of value as unknown[]) {
-    if (typeof item === "string") {
-      items.push(item);
-    }
-  }
-  return items;
+  return config;
 }

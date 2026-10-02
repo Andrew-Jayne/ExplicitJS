@@ -22,3 +22,34 @@ function main(): void {
   report("entry point");
 }
 main();
+
+// Calls spelled indirectly are still calls.
+function viaCall(amount: number): number { // expect: single_use_func
+  return amount * 2;
+}
+report(viaCall.call(null, 21));
+
+function viaParens(): string { // expect: single_use_func
+  return "parenthesized";
+}
+report((viaParens)());
+
+function viaTag(parts: TemplateStringsArray): string { // expect: single_use_func
+  return parts.join("");
+}
+report(viaTag`tagged`);
+
+function ViaNew(): void { // expect: single_use_func
+  this.ready = true;
+}
+report(new ViaNew());
+
+function passedByName(entry: string): string {
+  return entry;
+}
+report(entries.map(passedByName));
+
+function boundOnce(): string {
+  return "bound";
+}
+report(boundOnce.bind(null));

@@ -27,30 +27,6 @@ const LANG_ATTRIBUTE = /\blang\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/i;
 const SRC_ATTRIBUTE = /\bsrc\s*=/i;
 const TYPESCRIPT_LANGS: ReadonlySet<string> = new Set(["ts", "typescript"]);
 
-function isTypeScriptBlock(attributes: string): boolean {
-  const langMatch = LANG_ATTRIBUTE.exec(attributes);
-  if (langMatch === null) {
-    return false;
-  }
-  // The value sits in whichever alternative matched: double-quoted,
-  // single-quoted, or bare.
-  let value = langMatch[1];
-  if (value === undefined) {
-    value = langMatch[2];
-  }
-  if (value === undefined) {
-    value = langMatch[3];
-  }
-  if (value === undefined) {
-    return false;
-  }
-  return TYPESCRIPT_LANGS.has(value.toLowerCase());
-}
-
-function newlinesBefore(source: string, index: number): number {
-  return source.slice(0, index).split("\n").length - 1;
-}
-
 export function extractSvelteScripts(source: string): SvelteScriptBlock[] {
   const blocks: SvelteScriptBlock[] = [];
   // Attribute values may themselves contain `>` (Svelte 5's
@@ -72,11 +48,27 @@ export function extractSvelteScripts(source: string): SvelteScriptBlock[] {
       attributes = "";
     }
     if (SRC_ATTRIBUTE.test(attributes) === false) {
+      let isTypeScript = false;
+      const langMatch = LANG_ATTRIBUTE.exec(attributes);
+      if (langMatch !== null) {
+        // The value sits in whichever alternative matched: double-quoted,
+        // single-quoted, or bare.
+        let value = langMatch[1];
+        if (value === undefined) {
+          value = langMatch[2];
+        }
+        if (value === undefined) {
+          value = langMatch[3];
+        }
+        if (value !== undefined) {
+          isTypeScript = TYPESCRIPT_LANGS.has(value.toLowerCase());
+        }
+      }
       blocks.push({
         content:
-          "\n".repeat(newlinesBefore(source, contentStart)) +
+          "\n".repeat(source.slice(0, contentStart).split("\n").length - 1) +
           source.slice(contentStart, closeMatch.index),
-        isTypeScript: isTypeScriptBlock(attributes),
+        isTypeScript,
       });
     }
     openTag.lastIndex = closeTag.lastIndex;

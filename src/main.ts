@@ -9,7 +9,7 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import type { Args } from "./cliArgs.ts";
-import { type Config, loadConfig } from "./config.ts";
+import { loadConfig } from "./config.ts";
 import { Colors, ReportFormat, type StyleCheck } from "./constructs.ts";
 import { analyzeFile } from "./fileHandlers.ts";
 import { formatReport, generateChecksListing, generateStatisticsReport } from "./reporters.ts";
@@ -40,47 +40,25 @@ const SOURCE_EXTENSIONS: ReadonlySet<string> = new Set([
 ]);
 
 // Always skipped, whatever the config says: no `ignore` list can re-enable a
-// dependency or build tree, it can only add to this set.
-const SKIP_DIRS: ReadonlySet<string> = new Set([
-  "node_modules",
-  ".git",
+// dependency or build tree, it can only add to these sets. Dependency trees
+// (and every dotfile directory) are skipped at any depth.
+const DEPENDENCY_DIRS: ReadonlySet<string> = new Set(["node_modules"]);
+
+// Build-output names are also ordinary words (`src/features/build/`), so they
+// are skipped only where tools put them: beside a project manifest, or
+// directly under the analyzed root. Elsewhere they are source and get checked.
+const OUTPUT_DIRS: ReadonlySet<string> = new Set([
   "dist",
   "dist-test",
   "build",
   "out",
   "coverage",
-  ".next",
-  ".nuxt",
-  ".cache",
-  ".turbo",
   "vendor",
 ]);
 
+const PROJECT_MANIFESTS: readonly string[] = ["package.json", "deno.json", "deno.jsonc"];
+
 const DECLARATION_RE = /\.d\.(ts|mts|cts)$/;
-
-interface Settings {
-  noColor: boolean;
-  statsOnly: boolean;
-  outputFormat: ReportFormat;
-}
-
-function resolveFormat(cli: ReportFormat | null, config: ReportFormat | null): ReportFormat {
-  if (cli !== null) {
-    return cli;
-  }
-  if (config !== null) {
-    return config;
-  }
-  return ReportFormat.TEXT;
-}
-
-function resolveSettings(args: Args, config: Config): Settings {
-  return {
-    noColor: args.noColor === true,
-    statsOnly: args.statsOnly === true,
-    outputFormat: resolveFormat(args.format, config.format),
-  };
-}
 
 function isSupportedFile(filepath: string): boolean {
   if (DECLARATION_RE.test(filepath) === true) {
@@ -89,59 +67,14 @@ function isSupportedFile(filepath: string): boolean {
   return SOURCE_EXTENSIONS.has(path.extname(filepath).toLowerCase());
 }
 
-function isIgnoredDir(name: string, fullPath: string, config: Config): boolean {
-  if (SKIP_DIRS.has(name) === true || name.startsWith(".") === true) {
-    return true;
-  }
-  if (config.ignoreNames.has(name) === true) {
-    return true;
-  }
-  return config.ignorePaths.has(path.resolve(fullPath));
-}
-
-function collectFiles(target: string, config: Config): string[] {
-  const files: string[] = [];
-
-  if (statSync(target).isFile() === true) {
-    if (isSupportedFile(target) === true) {
-      files.push(target);
-    }
-    return files;
-  }
-
-  const pending: string[] = [target];
-  while (pending.length > 0) {
-    const dir = pending.pop();
-    if (dir === undefined) {
-      break;
-    }
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory() === true) {
-        if (isIgnoredDir(entry.name, full, config) === false) {
-          pending.push(full);
-        }
-      } else if (entry.isFile() === true && isSupportedFile(full) === true) {
-        files.push(full);
-      }
-    }
-  }
-  files.sort();
-  return files;
-}
-
-/** Print the `list-checks` catalog. */
-function printListing(listing: string, noColor: boolean | null): number {
-  if (noColor !== true && process.stdout.isTTY === true) {
-    Colors.enable();
-  }
-  writeOut(`${listing}\n`);
-  return EXIT_OK;
-}
-
 export function run(args: Args): number {
   if (args.path === "list-checks") {
-    return printListing(generateChecksListing(), args.noColor);
+    // Print the `list-checks` catalog.
+    if (args.noColor !== true && process.stdout.isTTY === true) {
+      Colors.enable();
+    }
+    writeOut(`${generateChecksListing()}\n`);
+    return EXIT_OK;
   }
   if (args.path === null) {
     writeErr("error: no path provided (see --help)\n");
@@ -153,13 +86,58 @@ export function run(args: Args): number {
   }
 
   const config = loadConfig(args.path, args.config);
-  const settings = resolveSettings(args, config);
 
-  if (settings.noColor !== true && process.stdout.isTTY === true) {
+  if (args.noColor !== true && process.stdout.isTTY === true) {
     Colors.enable();
   }
 
-  const files = collectFiles(args.path, config);
+  // Discover source files: the target itself, or a walk of its tree.
+  const target = args.path;
+  const files: string[] = [];
+  if (statSync(target).isFile() === true) {
+    if (isSupportedFile(target) === true) {
+      files.push(target);
+    }
+  } else {
+    const pending: string[] = [target];
+    while (pending.length > 0) {
+      const dir = pending.pop();
+      if (dir === undefined) {
+        break;
+      }
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory() === true) {
+          let ignored = false;
+          if (DEPENDENCY_DIRS.has(entry.name) === true || entry.name.startsWith(".") === true) {
+            ignored = true;
+          } else if (OUTPUT_DIRS.has(entry.name) === true) {
+            const parent = path.dirname(full);
+            if (path.resolve(parent) === path.resolve(target)) {
+              ignored = true;
+            }
+            for (const manifest of PROJECT_MANIFESTS) {
+              if (existsSync(path.join(parent, manifest)) === true) {
+                ignored = true;
+              }
+            }
+          }
+          if (config.ignoreNames.has(entry.name) === true) {
+            ignored = true;
+          }
+          if (config.ignorePaths.has(path.resolve(full)) === true) {
+            ignored = true;
+          }
+          if (ignored === false) {
+            pending.push(full);
+          }
+        } else if (entry.isFile() === true && isSupportedFile(full) === true) {
+          files.push(full);
+        }
+      }
+    }
+    files.sort();
+  }
   if (files.length === 0) {
     writeErr("error: no supported source files found to analyze\n");
     return EXIT_ARGS_ERROR;
@@ -170,11 +148,19 @@ export function run(args: Args): number {
     allChecks.push(...analyzeFile(filepath));
   }
 
+  // CLI flags win over the config file; text is the fallback.
+  let outputFormat = ReportFormat.TEXT;
+  if (args.format !== null) {
+    outputFormat = args.format;
+  } else if (config.format !== null) {
+    outputFormat = config.format;
+  }
+
   let report: string;
-  if (settings.statsOnly === true) {
+  if (args.statsOnly === true) {
     report = generateStatisticsReport(allChecks, files.length);
   } else {
-    report = formatReport(allChecks, settings.outputFormat);
+    report = formatReport(allChecks, outputFormat);
   }
 
   writeOut(`${report}\n`);

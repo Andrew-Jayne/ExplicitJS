@@ -10,10 +10,12 @@
  */
 
 import { assertEquals } from "jsr:@std/assert@^1.0.19";
-import { CHECK_TYPES, type CheckType } from "../src/constructs.ts";
+import { CHECK_TYPES } from "../src/constructs.ts";
 import { analyzeSource } from "../src/fileHandlers.ts";
 
-type Counts = Partial<Record<CheckType, number>>;
+// A sparse count table: a check type absent from it was reported zero times.
+// Keys are validated against CHECK_TYPES below.
+type Counts = Record<string, number>;
 
 interface Case {
   name: string;
@@ -22,19 +24,6 @@ interface Case {
 }
 
 const VALID = new Set<string>(CHECK_TYPES);
-
-function countByType(source: string): Counts {
-  const counts: Counts = {};
-  for (const check of analyzeSource(source, "case.ts")) {
-    const current = counts[check.checkType];
-    if (current === undefined) {
-      counts[check.checkType] = 1;
-    } else {
-      counts[check.checkType] = current + 1;
-    }
-  }
-  return counts;
-}
 
 const CASES: Case[] = [
   // --- if: truthiness in an if condition --------------------------------
@@ -295,7 +284,7 @@ const CASES: Case[] = [
   },
   {
     name: "single_use_func: main entry point is exempt",
-    source: "function main(): void { doStuff(); } function doStuff(): void {}",
+    source: "function main(): void { doStuff(); doStuff(); } function doStuff(): void {}",
     expect: {},
   },
   {
@@ -440,7 +429,16 @@ for (const testCase of CASES) {
   }
 
   Deno.test(testCase.name, () => {
-    assertEquals(countByType(testCase.source), testCase.expect);
+    const counts: Counts = {};
+    for (const check of analyzeSource(testCase.source, "case.ts")) {
+      const current = counts[check.checkType];
+      if (current === undefined) {
+        counts[check.checkType] = 1;
+      } else {
+        counts[check.checkType] = current + 1;
+      }
+    }
+    assertEquals(counts, testCase.expect);
   });
 }
 

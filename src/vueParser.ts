@@ -31,40 +31,6 @@ export interface VueScriptBlock {
 const LANG_ATTRIBUTE = /\blang\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/i;
 const SRC_ATTRIBUTE = /\bsrc\s*=/i;
 
-function blockLang(attributes: string): VueScriptLang {
-  const langMatch = LANG_ATTRIBUTE.exec(attributes);
-  if (langMatch === null) {
-    return "js";
-  }
-  // The value sits in whichever alternative matched: double-quoted,
-  // single-quoted, or bare.
-  let value = langMatch[1];
-  if (value === undefined) {
-    value = langMatch[2];
-  }
-  if (value === undefined) {
-    value = langMatch[3];
-  }
-  if (value === undefined) {
-    return "js";
-  }
-  const normalized = value.toLowerCase();
-  if (normalized === "ts" || normalized === "typescript") {
-    return "ts";
-  }
-  if (normalized === "tsx") {
-    return "tsx";
-  }
-  if (normalized === "jsx") {
-    return "jsx";
-  }
-  return "js";
-}
-
-function newlinesBefore(source: string, index: number): number {
-  return source.slice(0, index).split("\n").length - 1;
-}
-
 export function extractVueScripts(source: string): VueScriptBlock[] {
   const blocks: VueScriptBlock[] = [];
   const openTag = /<script\b((?:"[^"]*"|'[^']*'|[^>"'])*)>/gi;
@@ -83,11 +49,34 @@ export function extractVueScripts(source: string): VueScriptBlock[] {
       attributes = "";
     }
     if (SRC_ATTRIBUTE.test(attributes) === false) {
+      let lang: VueScriptLang = "js";
+      const langMatch = LANG_ATTRIBUTE.exec(attributes);
+      if (langMatch !== null) {
+        // The value sits in whichever alternative matched: double-quoted,
+        // single-quoted, or bare.
+        let value = langMatch[1];
+        if (value === undefined) {
+          value = langMatch[2];
+        }
+        if (value === undefined) {
+          value = langMatch[3];
+        }
+        if (value !== undefined) {
+          const normalized = value.toLowerCase();
+          if (normalized === "ts" || normalized === "typescript") {
+            lang = "ts";
+          } else if (normalized === "tsx") {
+            lang = "tsx";
+          } else if (normalized === "jsx") {
+            lang = "jsx";
+          }
+        }
+      }
       blocks.push({
         content:
-          "\n".repeat(newlinesBefore(source, contentStart)) +
+          "\n".repeat(source.slice(0, contentStart).split("\n").length - 1) +
           source.slice(contentStart, closeMatch.index),
-        lang: blockLang(attributes),
+        lang,
       });
     }
     openTag.lastIndex = closeTag.lastIndex;

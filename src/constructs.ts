@@ -30,7 +30,9 @@ export enum CheckType {
   TERNARY = "ternary",
   NULLISH_COALESCE = "nullish_coalesce",
   OPTIONAL_CHAIN = "optional_chain",
+  NON_NULL = "non_null",
   BOOL_OP = "bool_op",
+  NOT = "not",
   BOOL_ATTR = "bool_attr",
   ARROW = "arrow",
   FILTER = "filter",
@@ -56,22 +58,26 @@ export const CHECK_DESCRIPTIONS: Readonly<Record<CheckType, string>> = {
   [CheckType.IF]:
     "Implicit truthiness in an if condition ('if (items)') - compare explicitly (=== null, .length > 0, ...)",
   [CheckType.WHILE]:
-    "Implicit truthiness in a while/do-while condition - write an explicit comparison",
+    "Implicit truthiness in a while/do-while/for condition - write an explicit comparison",
   [CheckType.ASSERT]:
-    "Implicit truthiness in assert/console.assert/assert.ok - assert an explicit comparison",
+    "Implicit truthiness in assert/console.assert/assert.ok/assert.strict (however imported or spelled) - assert an explicit comparison",
   [CheckType.TERNARY]: "Inline conditional 'cond ? x : y' - use an explicit if/else block",
   [CheckType.NULLISH_COALESCE]:
     "'??' / '??=' inline null-defaulting - test === null / === undefined explicitly",
   [CheckType.OPTIONAL_CHAIN]:
     "Optional chaining 'a?.b' hides missing fields - validate the shape once, then access directly",
+  [CheckType.NON_NULL]:
+    "Non-null assertion 'a!.b' claims presence instead of checking it - validate the shape or test explicitly ('items[0]!' index access is exempt)",
   [CheckType.BOOL_OP]:
     "'&&' / '||' (and '&&=' / '||=') with a non-boolean operand - write an explicit comparison for each operand",
+  [CheckType.NOT]:
+    "Negation '!value' anywhere outside a condition ('const missing = !items', '!items === true') - compare explicitly (=== false, === null, ...)",
   [CheckType.BOOL_ATTR]:
     "Bare attribute in JSX or a Svelte/Vue template ('<Widget active />') relies on the implicit-true convention - write the value out (active={true}, :active=\"true\")",
   [CheckType.ARROW]:
     "Arrow/function expression hiding an implicit-boolean body - use a named function with explicit comparisons",
   [CheckType.FILTER]:
-    "'.filter(Boolean)' uses implicit truthiness as the predicate - pass an explicit predicate",
+    "Truthiness predicate in .filter/.find/.some/.every ('Boolean', 'String', 'Number', or a callback returning a bare value) - pass an explicit predicate",
   [CheckType.LOOSE_EQUALITY]: "Loose '==' / '!=' coerces operands - use '===' / '!=='",
   [CheckType.SINGLE_LETTER_VAR]:
     "Single-letter name carries no semantic meaning - use a descriptive name",
@@ -80,7 +86,7 @@ export const CHECK_DESCRIPTIONS: Readonly<Record<CheckType, string>> = {
   [CheckType.SINGLE_USE_FUNC]:
     "Function called exactly once - inline it at the call site (exports and 'main' are exempt)",
   [CheckType.OPTIONAL_PARAM]:
-    "Optional 'name?: T' parameter, property or method - write 'name: T | null' (plus '= null' where a default is legal) so the absent value is named and callers must handle it",
+    "Optional 'name?: T' parameter, property or method, or optional-everything via Partial<T> / a '?:' mapped type - write 'name: T | null' (plus '= null' where a default is legal) so the absent value is named and callers must handle it",
 };
 
 export interface StyleCheck {

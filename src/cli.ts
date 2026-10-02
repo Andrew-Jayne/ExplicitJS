@@ -9,9 +9,6 @@ import { EXIT_ARGS_ERROR, run } from "./main.ts";
 
 const VERSION = "1beta5";
 
-function writeErr(message: string): void {
-  process.stderr.write(message);
-}
 function writeOut(message: string): void {
   process.stdout.write(message);
 }
@@ -22,7 +19,7 @@ function main(): void {
     args = parseArgs(process.argv.slice(2));
   } catch (error) {
     if (error instanceof ArgError) {
-      writeErr(`error: ${error.message}\n`);
+      process.stderr.write(`error: ${error.message}\n`);
       process.exit(EXIT_ARGS_ERROR);
     }
     throw error;

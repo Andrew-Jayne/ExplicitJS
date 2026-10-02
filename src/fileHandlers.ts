@@ -4,7 +4,8 @@
  * list of checks. `.svelte` and `.vue` components
  * are analyzed per `<script>` block — the blocks are extracted (newline-padded,
  * so check lines refer to the original file) and each runs through the same
- * passes.
+ * passes — and their template markup runs through `analyzeTemplate`. Names the
+ * template reads count as uses for the scripts' single-use analysis.
  */
 
 import { readFileSync } from "node:fs";
@@ -12,30 +13,12 @@ import path from "node:path";
 import ts from "typescript";
 import { analyzeAst } from "./codeVisitor.ts";
 import type { StyleCheck } from "./constructs.ts";
-import { findBareMarkupAttrs } from "./markupAttrs.ts";
 import { findSingleUse } from "./singleUse.ts";
-import { extractSvelteScripts, type SvelteScriptBlock } from "./svelteParser.ts";
+import { extractSvelteScripts } from "./svelteParser.ts";
+import { analyzeTemplate } from "./templateExpressions.ts";
 import { extractVueScripts, type VueScriptLang } from "./vueParser.ts";
 
 const TSX_EXTENSIONS: ReadonlySet<string> = new Set([".tsx", ".jsx"]);
-
-function scriptKindFor(filename: string): ts.ScriptKind {
-  const ext = path.extname(filename).toLowerCase();
-  if (TSX_EXTENSIONS.has(ext) === true) {
-    return ts.ScriptKind.TSX;
-  }
-  if (ext === ".ts" || ext === ".mts" || ext === ".cts") {
-    return ts.ScriptKind.TS;
-  }
-  return ts.ScriptKind.JS;
-}
-
-function blockScriptKind(block: SvelteScriptBlock): ts.ScriptKind {
-  if (block.isTypeScript === true) {
-    return ts.ScriptKind.TS;
-  }
-  return ts.ScriptKind.JS;
-}
 
 const VUE_SCRIPT_KINDS: Readonly<Record<VueScriptLang, ts.ScriptKind>> = {
   js: ts.ScriptKind.JS,
@@ -47,25 +30,44 @@ const VUE_SCRIPT_KINDS: Readonly<Record<VueScriptLang, ts.ScriptKind>> = {
 export function analyzeSource(source: string, filename: string): StyleCheck[] {
   const extension = path.extname(filename).toLowerCase();
   if (extension === ".svelte") {
+    const template = analyzeTemplate(source, filename, "svelte");
     const checks: StyleCheck[] = [];
     for (const block of extractSvelteScripts(source)) {
-      checks.push(...analyzeScript(block.content, filename, blockScriptKind(block)));
+      let scriptKind = ts.ScriptKind.JS;
+      if (block.isTypeScript === true) {
+        scriptKind = ts.ScriptKind.TS;
+      }
+      checks.push(...analyzeScript(block.content, filename, scriptKind, template.readNames));
     }
-    checks.push(...findBareMarkupAttrs(source, filename, "svelte"));
+    checks.push(...template.checks);
     return checks;
   }
   if (extension === ".vue") {
+    const template = analyzeTemplate(source, filename, "vue");
     const checks: StyleCheck[] = [];
     for (const block of extractVueScripts(source)) {
-      checks.push(...analyzeScript(block.content, filename, VUE_SCRIPT_KINDS[block.lang]));
+      checks.push(
+        ...analyzeScript(block.content, filename, VUE_SCRIPT_KINDS[block.lang], template.readNames),
+      );
     }
-    checks.push(...findBareMarkupAttrs(source, filename, "vue"));
+    checks.push(...template.checks);
     return checks;
   }
-  return analyzeScript(source, filename, scriptKindFor(filename));
+  if (TSX_EXTENSIONS.has(extension) === true) {
+    return analyzeScript(source, filename, ts.ScriptKind.TSX, new Set());
+  }
+  if (extension === ".ts" || extension === ".mts" || extension === ".cts") {
+    return analyzeScript(source, filename, ts.ScriptKind.TS, new Set());
+  }
+  return analyzeScript(source, filename, ts.ScriptKind.JS, new Set());
 }
 
-function analyzeScript(source: string, filename: string, scriptKind: ts.ScriptKind): StyleCheck[] {
+function analyzeScript(
+  source: string,
+  filename: string,
+  scriptKind: ts.ScriptKind,
+  templateReads: ReadonlySet<string>,
+): StyleCheck[] {
   const sourceFile = ts.createSourceFile(
     filename,
     source,
@@ -75,7 +77,7 @@ function analyzeScript(source: string, filename: string, scriptKind: ts.ScriptKi
   );
 
   const checks = analyzeAst(sourceFile, filename);
-  checks.push(...findSingleUse(sourceFile, filename));
+  checks.push(...findSingleUse(sourceFile, filename, templateReads));
   return checks;
 }
 

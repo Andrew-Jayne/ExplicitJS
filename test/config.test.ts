@@ -124,3 +124,32 @@ Deno.test("config: no key can disable a check", () => {
     Deno.removeSync(root, { recursive: true });
   }
 });
+
+Deno.test("walk: build-output names are skipped only where build tools put them", () => {
+  const root = Deno.makeTempDirSync();
+  try {
+    writeFileSync(path.join(root, "package.json"), "{}\n");
+    mkdirSync(path.join(root, "packages", "app"), { recursive: true });
+    writeFileSync(path.join(root, "packages", "app", "package.json"), "{}\n");
+    for (const directory of [
+      "dist",
+      "packages/app/build",
+      "packages/app/src/features/build",
+      "src/out",
+      "src/vendor",
+    ]) {
+      mkdirSync(path.join(root, directory), { recursive: true });
+      writeFileSync(path.join(root, directory, "sample.ts"), "if (value) {}\n");
+    }
+    const report = runCli([root, "--format", "json"]).stdout;
+    // Beside a manifest: output, skipped.
+    assertEquals(report.includes(`${root}${path.sep}dist${path.sep}`), false);
+    assertEquals(report.includes(`app${path.sep}build${path.sep}`), false);
+    // Anywhere else the same names are ordinary source directories.
+    assertEquals(report.includes(`features${path.sep}build${path.sep}`), true);
+    assertEquals(report.includes(`src${path.sep}out${path.sep}`), true);
+    assertEquals(report.includes(`src${path.sep}vendor${path.sep}`), true);
+  } finally {
+    Deno.removeSync(root, { recursive: true });
+  }
+});

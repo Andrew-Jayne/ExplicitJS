@@ -51,3 +51,36 @@ Deno.test("baseline: src/ report never changes (always zero checks)", () => {
 Deno.test("baseline: tests tree stats match nfo (exactly the fixture specimens)", () => {
   assertEquals(liveOutput("test"), committed("tests.out"));
 });
+
+// The stats baseline only pins totals, so a real violation in the harness can
+// hide inside them as if it were a specimen. This names any finding outside
+// the fixtures by file and line; the fixtures' own findings are asserted line
+// by line against their markers in fixtures.test.ts.
+const FIXTURES_PREFIX = `${path.join("test", "fixtures")}${path.sep}`;
+
+Deno.test("baseline: the only findings in the tests tree are fixture specimens", () => {
+  const strays: string[] = [];
+  for (const finding of JSON.parse(
+    new TextDecoder().decode(
+      new Deno.Command(Deno.execPath(), {
+        args: [
+          "run",
+          "--allow-read",
+          "--allow-env",
+          path.join(REPO_ROOT, "src", "cli.ts"),
+          "test",
+          "--format",
+          "json",
+        ],
+        cwd: REPO_ROOT,
+        stdout: "piped",
+        stderr: "piped",
+      }).outputSync().stdout,
+    ),
+  ) as { file: string; line: number; check_type: string }[]) {
+    if (finding.file.startsWith(FIXTURES_PREFIX) === false) {
+      strays.push(`${finding.file}:${finding.line} ${finding.check_type}`);
+    }
+  }
+  assertEquals(strays, []);
+});

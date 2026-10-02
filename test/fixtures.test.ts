@@ -29,30 +29,6 @@ interface SyntaxCase {
   syntheticName: string;
 }
 
-function syntaxCasesFor(fixturePath: string): SyntaxCase[] {
-  const source = readFileSync(fixturePath, "utf-8");
-  const extension = path.extname(fixturePath).toLowerCase();
-  if (extension === ".svelte") {
-    const cases: SyntaxCase[] = [];
-    for (const block of extractSvelteScripts(source)) {
-      let syntheticName = "block.js";
-      if (block.isTypeScript === true) {
-        syntheticName = "block.ts";
-      }
-      cases.push({ content: block.content, syntheticName });
-    }
-    return cases;
-  }
-  if (extension === ".vue") {
-    const cases: SyntaxCase[] = [];
-    for (const block of extractVueScripts(source)) {
-      cases.push({ content: block.content, syntheticName: `block.${block.lang}` });
-    }
-    return cases;
-  }
-  return [{ content: source, syntheticName: path.basename(fixturePath) }];
-}
-
 for (const fixturePath of discoverFixtures()) {
   const fixtureName = path.basename(fixturePath);
   const spec = parseFixture(fixturePath);
@@ -67,7 +43,24 @@ for (const fixturePath of discoverFixtures()) {
   });
 
   Deno.test(`fixture syntax: ${fixtureName}`, () => {
-    const cases = syntaxCasesFor(fixturePath);
+    const source = readFileSync(fixturePath, "utf-8");
+    const extension = path.extname(fixturePath).toLowerCase();
+    const cases: SyntaxCase[] = [];
+    if (extension === ".svelte") {
+      for (const block of extractSvelteScripts(source)) {
+        let syntheticName = "block.js";
+        if (block.isTypeScript === true) {
+          syntheticName = "block.ts";
+        }
+        cases.push({ content: block.content, syntheticName });
+      }
+    } else if (extension === ".vue") {
+      for (const block of extractVueScripts(source)) {
+        cases.push({ content: block.content, syntheticName: `block.${block.lang}` });
+      }
+    } else {
+      cases.push({ content: source, syntheticName: path.basename(fixturePath) });
+    }
     if (cases.length === 0) {
       throw new Error(`${fixtureName}: no script content extracted - fixture asserts nothing`);
     }

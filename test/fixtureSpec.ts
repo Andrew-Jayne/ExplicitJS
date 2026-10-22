@@ -8,7 +8,9 @@
  * fixture — one run, one expected multiset.
  */
 
-import { readdirSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isCheckType } from "../src/constructs.ts";
@@ -18,6 +20,32 @@ export const TESTS_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.dirname(TESTS_DIR);
 
 const FIXTURES_DIR = path.join(TESTS_DIR, "fixtures");
+
+export interface CliResult {
+  stdout: string;
+  stderr: string;
+  code: number;
+}
+
+export function runCli(cliArgs: string[]): CliResult {
+  const finished = spawnSync(
+    process.execPath,
+    [path.join(REPO_ROOT, "src", "cli.ts"), ...cliArgs],
+    { cwd: REPO_ROOT, encoding: "utf-8" },
+  );
+  if (finished.status === null) {
+    throw new Error(`cli terminated by ${finished.signal}`);
+  }
+  return { stdout: finished.stdout, stderr: finished.stderr, code: finished.status };
+}
+
+export function makeTempDir(): string {
+  return mkdtempSync(path.join(tmpdir(), "explicitjs-"));
+}
+
+export function removeDir(directory: string): void {
+  rmSync(directory, { recursive: true, force: true });
+}
 
 const FIXTURE_EXTENSIONS: ReadonlySet<string> = new Set([
   ".js",

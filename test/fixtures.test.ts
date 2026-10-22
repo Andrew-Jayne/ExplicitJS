@@ -13,7 +13,8 @@
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import ts from "typescript";
+import { test } from "node:test";
+import ts from "typescript6";
 import { extractSvelteScripts } from "../src/svelteParser.ts";
 import { extractVueScripts } from "../src/vueParser.ts";
 import {
@@ -33,7 +34,7 @@ for (const fixturePath of discoverFixtures()) {
   const fixtureName = path.basename(fixturePath);
   const spec = parseFixture(fixturePath);
 
-  Deno.test(`fixture: ${fixtureName}`, () => {
+  test(`fixture: ${fixtureName}`, () => {
     const actual = actualFor(spec);
     if (countersEqual(spec.expected, actual) === false) {
       throw new Error(
@@ -42,7 +43,7 @@ for (const fixturePath of discoverFixtures()) {
     }
   });
 
-  Deno.test(`fixture syntax: ${fixtureName}`, () => {
+  test(`fixture syntax: ${fixtureName}`, () => {
     const source = readFileSync(fixturePath, "utf-8");
     const extension = path.extname(fixturePath).toLowerCase();
     const cases: SyntaxCase[] = [];

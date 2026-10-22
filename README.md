@@ -4,17 +4,12 @@ A semantic clarity enforcer for production JavaScript & TypeScript.
 
 ExplicitJS flags code where the author's intent is ambiguous — patterns that force the next reader (or LLM) to guess what was meant instead of knowing. It is the JS/TS counterpart of [`explicit`](https://github.com/Andrew-Jayne/explicit) for Python.
 
-**Deno:** run straight from this repo, no build step, no registry
+Prebuilt tarball attached to every GitHub Release:
 ```bash
-deno install -g --allow-read --allow-env --import-map https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta5/deno.json -n explicitjs https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta5/src/cli.ts
+pnpm add -D https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta6/explicitjs-1beta6.tgz
 ```
 
-**Bun/NPM:** prebuilt tarball attached to every GitHub Release
-```bash
-bun add -d https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta5/explicitjs-1beta5.tgz
-```
-
-Other routes (shell aliases, tracking `main`, running from a clone) see: [docs/install.md](docs/install.md).
+Other routes (global install, running from a clone) see: [docs/install.md](docs/install.md).
 
 ## What it catches
 
@@ -85,7 +80,7 @@ ExplicitJS reads an optional `.explicitrc.json` — discovered by walking up fro
 ```
 
 - **`format`** — the default output format. `--format` overrides it.
-- **`ignore`** — directories to skip **on top of** the built-in list, which no config can re-enable: `node_modules` and dotfile directories at any depth, and the build-output names `dist`, `dist-test`, `build`, `out`, `coverage` and `vendor` wherever build tools put them — directly under the analyzed root, or beside a `package.json` / `deno.json`. Elsewhere those names are ordinary source directories (`src/features/build/`) and are checked. A bare name skips that directory at any depth; an entry containing a separator is a path relative to the config file, so it means the same directory wherever you invoke the tool from. Directories only — no file patterns, no globs.
+- **`ignore`** — directories to skip **on top of** the built-in list, which no config can re-enable: `node_modules` and dotfile directories at any depth, and the build-output names `dist`, `dist-test`, `build`, `out`, `coverage` and `vendor` wherever build tools put them — directly under the analyzed root, or beside a `package.json`. Elsewhere those names are ordinary source directories (`src/features/build/`) and are checked. A bare name skips that directory at any depth; an entry containing a separator is a path relative to the config file, so it means the same directory wherever you invoke the tool from. Directories only — no file patterns, no globs.
 
 Everything else is a command-line flag: `--stats-only` and `--no-color` are choices about one run, not facts about the project, and putting them in the file does nothing.
 
@@ -121,11 +116,8 @@ The goal is not style, it's semantic precision: code should say what it means so
 
 ## Requirements
 
-Any one of:
-
-- [Deno](https://deno.com/) >= 2.8
-- [Bun](https://bun.sh/) >= 1.0
-- Node.js + npm (any version recent enough to run [tsx](https://tsx.is/))
+- [Node.js](https://nodejs.org/) >= 26
+- [pnpm](https://pnpm.io/) for development (npm works for installing the release tarball)
 
 ## Contributing
 

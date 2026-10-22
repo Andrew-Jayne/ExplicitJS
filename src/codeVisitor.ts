@@ -9,7 +9,7 @@
  * Scope-level checks (single-use var/func) live in `singleUse.ts`.
  */
 
-import ts from "typescript";
+import ts from "typescript6";
 import { CheckType, type StyleCheck } from "./constructs.ts";
 
 const MAX_CODE_LENGTH = 100;
@@ -215,11 +215,12 @@ export class CodeVisitor {
   private readonly checks: StyleCheck[] = [];
   private readonly seenNames = new Set<string>();
   private readonly assertAliases: ReadonlyMap<string, string>;
+  private readonly filename: string;
+  private readonly sourceFile: ts.SourceFile;
 
-  constructor(
-    private readonly filename: string,
-    private readonly sourceFile: ts.SourceFile,
-  ) {
+  constructor(filename: string, sourceFile: ts.SourceFile) {
+    this.filename = filename;
+    this.sourceFile = sourceFile;
     // Local names bound by `import ... from "node:assert"` (and friends),
     // mapped to canonical paths.
     const aliases = new Map<string, string>();

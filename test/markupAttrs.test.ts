@@ -4,7 +4,8 @@
  * that the fixtures cannot cover line by line.
  */
 
-import { assertEquals } from "jsr:@std/assert@^1.0.19";
+import assert from "node:assert/strict";
+import { test } from "node:test";
 import { findBareMarkupAttrs, type MarkupFlavor } from "../src/markupAttrs.ts";
 
 interface MarkupCase {
@@ -73,8 +74,8 @@ const CASES: MarkupCase[] = [
 ];
 
 for (const markupCase of CASES) {
-  Deno.test(`markup attrs: ${markupCase.name}`, () => {
-    assertEquals(
+  test(`markup attrs: ${markupCase.name}`, () => {
+    assert.deepEqual(
       findBareMarkupAttrs(markupCase.source, "case.file", markupCase.flavor).map(
         (check) => check.code,
       ),

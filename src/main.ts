@@ -56,8 +56,6 @@ const OUTPUT_DIRS: ReadonlySet<string> = new Set([
   "vendor",
 ]);
 
-const PROJECT_MANIFESTS: readonly string[] = ["package.json", "deno.json", "deno.jsonc"];
-
 const DECLARATION_RE = /\.d\.(ts|mts|cts)$/;
 
 function isSupportedFile(filepath: string): boolean {
@@ -116,10 +114,8 @@ export function run(args: Args): number {
             if (path.resolve(parent) === path.resolve(target)) {
               ignored = true;
             }
-            for (const manifest of PROJECT_MANIFESTS) {
-              if (existsSync(path.join(parent, manifest)) === true) {
-                ignored = true;
-              }
+            if (existsSync(path.join(parent, "package.json")) === true) {
+              ignored = true;
             }
           }
           if (config.ignoreNames.has(entry.name) === true) {
@@ -149,7 +145,7 @@ export function run(args: Args): number {
   }
 
   // CLI flags win over the config file; text is the fallback.
-  let outputFormat = ReportFormat.TEXT;
+  let outputFormat: ReportFormat = ReportFormat.TEXT;
   if (args.format !== null) {
     outputFormat = args.format;
   } else if (config.format !== null) {

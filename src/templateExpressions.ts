@@ -16,7 +16,7 @@
  * can count it as used.
  */
 
-import ts from "typescript";
+import ts from "typescript6";
 import { analyzeAst } from "./codeVisitor.ts";
 import { CheckType, type StyleCheck } from "./constructs.ts";
 import { type MarkupFlavor, scanMarkup, type TemplateRole } from "./markupAttrs.ts";

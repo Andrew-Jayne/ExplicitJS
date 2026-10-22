@@ -1,41 +1,16 @@
 # Installing ExplicitJS
 
-ExplicitJS is not published to any package registry. Deno runs it straight from this repository; Bun and npm install a prebuilt tarball from the [Releases page](https://github.com/Andrew-Jayne/ExplicitJS/releases). Pick whichever runtime you already have.
+ExplicitJS is not published to any package registry. Each [Release](https://github.com/Andrew-Jayne/ExplicitJS/releases) has a tarball attached, named `explicitjs-<version>.tgz` after the `version` in that release's `package.json`. It needs Node.js >= 26.
 
-Every Deno route needs three flags. `--import-map` points at this repo's `deno.json`, which maps the bare `typescript` import onto `npm:typescript`; Deno doesn't fetch it on its own when running from a URL, so without the flag it fails with `Import "typescript" not a dependency`. `--allow-read` is for the files you scan. `--allow-env` exists because the `typescript` package reads `TSC_*` watch-mode variables at init — never used here, but Deno blocks the read without it.
-
-## Deno
-
-**Install as a shim** (pinned, recommended). Deno fetches the import graph from the URL and caches it, so a pinned URL resolves only once per version:
+## pnpm or npm
 
 ```bash
-deno install -g --allow-read --allow-env --import-map https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta5/deno.json -n explicitjs https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta5/src/cli.ts
-explicitjs <path>
-```
+# pnpm, as a dev dependency
+pnpm add -D https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta6/explicitjs-1beta6.tgz
+pnpm exec explicitjs <path>
 
-**Run without installing, via a shell alias:**
-
-```bash
-# Pinned to a release tag — immutable, auditable at a fixed commit:
-alias explicitjs="deno run --allow-read --allow-env --import-map https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta5/deno.json https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/v1beta5/src/cli.ts"
-
-# Or track the latest on main (mutable):
-alias explicitjs="deno run --allow-read --allow-env --import-map https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/main/deno.json https://raw.githubusercontent.com/Andrew-Jayne/ExplicitJS/main/src/cli.ts"
-```
-
-Available tags are on the [Releases page](https://github.com/Andrew-Jayne/ExplicitJS/releases).
-
-## Bun or npm
-
-Each release has an npm-installable tarball attached, named `explicitjs-<version>.tgz` after the `version` in that release's `package.json`.
-
-```bash
-# Bun — add as a dev dependency
-bun add -d https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta5/explicitjs-1beta5.tgz
-bunx explicitjs <path>
-
-# npm — global install
-npm install -g https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta5/explicitjs-1beta5.tgz
+# npm, global install
+npm install -g https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta6/explicitjs-1beta6.tgz
 explicitjs <path>
 ```
 
@@ -51,29 +26,17 @@ A dev dependency pins the same version for every developer, and slots into a `pa
 ```
 
 ```bash
-bun run lint:explicit
+pnpm lint:explicit
 ```
 
 ## From a clone
 
-Contributing, or want the source tree directly?
+Node 26 runs the TypeScript source directly, so a clone needs no build step:
 
 ```bash
 git clone https://github.com/Andrew-Jayne/ExplicitJS.git && cd ExplicitJS
-
-# Deno — no install step:
-deno task start <path>
-
-# Bun runs the TypeScript source directly:
-bun install
-bun src/cli.ts <path>
-
-# npm needs a TS runner (tsx) since plain Node can't execute this source yet;
-# package.json wires that up:
-npm install
-npm start -- <path>
+pnpm install
+pnpm start <path>
 ```
-
-Don't mix the two: `bun run start` (as opposed to `bun src/cli.ts`) fails, because the `start` script shells out to `tsx`, which isn't Bun-compatible. Bun doesn't need `tsx` at all, so run the file directly.
 
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for the rest of the development workflow.

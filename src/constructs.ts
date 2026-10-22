@@ -7,11 +7,13 @@
  * test suite).
  */
 
-export enum ReportFormat {
-  TEXT = "text",
-  JSON = "json",
-  CSV = "csv",
-}
+export const ReportFormat = {
+  TEXT: "text",
+  JSON: "json",
+  CSV: "csv",
+} as const;
+
+export type ReportFormat = (typeof ReportFormat)[keyof typeof ReportFormat];
 
 export const REPORT_FORMATS: readonly ReportFormat[] = [
   ReportFormat.TEXT,
@@ -23,25 +25,27 @@ export function isReportFormat(value: string): value is ReportFormat {
   return (REPORT_FORMATS as readonly string[]).includes(value);
 }
 
-export enum CheckType {
-  IF = "if",
-  WHILE = "while",
-  ASSERT = "assert",
-  TERNARY = "ternary",
-  NULLISH_COALESCE = "nullish_coalesce",
-  OPTIONAL_CHAIN = "optional_chain",
-  NON_NULL = "non_null",
-  BOOL_OP = "bool_op",
-  NOT = "not",
-  BOOL_ATTR = "bool_attr",
-  ARROW = "arrow",
-  FILTER = "filter",
-  LOOSE_EQUALITY = "loose_equality",
-  SINGLE_LETTER_VAR = "single_letter_var",
-  SINGLE_USE_VAR = "single_use_var",
-  SINGLE_USE_FUNC = "single_use_func",
-  OPTIONAL_PARAM = "optional_param",
-}
+export const CheckType = {
+  IF: "if",
+  WHILE: "while",
+  ASSERT: "assert",
+  TERNARY: "ternary",
+  NULLISH_COALESCE: "nullish_coalesce",
+  OPTIONAL_CHAIN: "optional_chain",
+  NON_NULL: "non_null",
+  BOOL_OP: "bool_op",
+  NOT: "not",
+  BOOL_ATTR: "bool_attr",
+  ARROW: "arrow",
+  FILTER: "filter",
+  LOOSE_EQUALITY: "loose_equality",
+  SINGLE_LETTER_VAR: "single_letter_var",
+  SINGLE_USE_VAR: "single_use_var",
+  SINGLE_USE_FUNC: "single_use_func",
+  OPTIONAL_PARAM: "optional_param",
+} as const;
+
+export type CheckType = (typeof CheckType)[keyof typeof CheckType];
 
 export const CHECK_TYPES: readonly CheckType[] = Object.values(CheckType);
 

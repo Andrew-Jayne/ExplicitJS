@@ -9,6 +9,7 @@
 
 import { readdirSync } from "node:fs";
 import path from "node:path";
+import { test } from "node:test";
 import { analyzeFile } from "../src/fileHandlers.ts";
 import { REPO_ROOT } from "./fixtureSpec.ts";
 
@@ -26,7 +27,7 @@ if (SOURCE_FILES.length === 0) {
 }
 
 for (const sourcePath of SOURCE_FILES) {
-  Deno.test(`self: ${path.basename(sourcePath)}`, () => {
+  test(`self: ${path.basename(sourcePath)}`, () => {
     const checks = analyzeFile(sourcePath);
     if (checks.length > 0) {
       const failure: string[] = [];

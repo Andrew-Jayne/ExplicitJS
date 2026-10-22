@@ -2,7 +2,7 @@
 # tagged commit passes the full gate: type check, tests, Biome, and the
 # dogfood lint (ExplicitJS run on its own source). Nothing ships that fails
 # its own rules. The release also gets an npm-installable tarball attached
-# (compiled dist/, no Deno-only APIs) so Bun/npm users don't need to clone
+# (compiled dist/) so pnpm/npm users don't need to clone
 # the repo to use it — see docs/install.md.
 name: Release
 
@@ -18,24 +18,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: denoland/setup-deno@v2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
-          deno-version: v2.x
+          node-version: 26
+          cache: pnpm
       - name: Install dependencies
-        run: deno install
+        run: pnpm install --frozen-lockfile
       - name: Type check
-        run: deno task check
+        run: pnpm check
       - name: Test
-        run: deno task test
+        run: pnpm test
       - name: Format & lint
-        run: deno task fmt:check
+        run: pnpm fmt:check
       - name: Dogfood lint
-        run: deno task lint
-      - uses: oven-sh/setup-bun@v2
-      - name: Install dependencies
-        run: bun install
+        run: pnpm lint
       - name: Build & pack tarball
-        run: bun run build && npm pack --ignore-scripts
+        run: pnpm pack
       - name: Create GitHub Release
         run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes ./*.tgz
         env:

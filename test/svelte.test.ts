@@ -8,7 +8,8 @@
  * itself, so optional chaining is off the table even in tests.
  */
 
-import { assertEquals } from "jsr:@std/assert@^1.0.19";
+import assert from "node:assert/strict";
+import { test } from "node:test";
 import type { StyleCheck } from "../src/constructs.ts";
 import { analyzeSource } from "../src/fileHandlers.ts";
 import { extractSvelteScripts, type SvelteScriptBlock } from "../src/svelteParser.ts";
@@ -29,37 +30,37 @@ function checkAt(checks: StyleCheck[], index: number): StyleCheck {
   return check;
 }
 
-Deno.test("extract: no script block yields no blocks", () => {
-  assertEquals(extractSvelteScripts("<div>static</div>\n"), []);
+test("extract: no script block yields no blocks", () => {
+  assert.deepEqual(extractSvelteScripts("<div>static</div>\n"), []);
 });
 
-Deno.test("extract: unterminated script block yields no blocks", () => {
-  assertEquals(extractSvelteScripts("<script>\nif (items) {}\n"), []);
+test("extract: unterminated script block yields no blocks", () => {
+  assert.deepEqual(extractSvelteScripts("<script>\nif (items) {}\n"), []);
 });
 
-Deno.test("extract: instance script is plain JS by default", () => {
+test("extract: instance script is plain JS by default", () => {
   const blocks = extractSvelteScripts("<script>\nconsole.log(1);\n</script>\n<div />\n");
-  assertEquals(blocks.length, 1);
-  assertEquals(blockAt(blocks, 0).isTypeScript, false);
+  assert.deepEqual(blocks.length, 1);
+  assert.deepEqual(blockAt(blocks, 0).isTypeScript, false);
 });
 
-Deno.test("extract: lang attribute marks TypeScript in any quote style", () => {
+test("extract: lang attribute marks TypeScript in any quote style", () => {
   for (const attr of ['lang="ts"', "lang='ts'", "lang=ts", 'lang="typescript"']) {
-    assertEquals(
+    assert.deepEqual(
       blockAt(extractSvelteScripts(`<script ${attr}>\nconsole.log(1);\n</script>\n`), 0)
         .isTypeScript,
       true,
       attr,
     );
   }
-  assertEquals(
+  assert.deepEqual(
     blockAt(extractSvelteScripts('<script lang="coffee">\nconsole.log(1);\n</script>\n'), 0)
       .isTypeScript,
     false,
   );
 });
 
-Deno.test("extract: module and instance scripts both come back", () => {
+test("extract: module and instance scripts both come back", () => {
   const blocks = extractSvelteScripts(
     [
       '<script context="module" lang="ts">',
@@ -71,32 +72,32 @@ Deno.test("extract: module and instance scripts both come back", () => {
       "<div />",
     ].join("\n"),
   );
-  assertEquals(blocks.length, 2);
-  assertEquals(blockAt(blocks, 0).isTypeScript, true);
-  assertEquals(blockAt(blocks, 1).isTypeScript, true);
+  assert.deepEqual(blocks.length, 2);
+  assert.deepEqual(blockAt(blocks, 0).isTypeScript, true);
+  assert.deepEqual(blockAt(blocks, 1).isTypeScript, true);
 });
 
-Deno.test("extract: generics attribute may contain '>'", () => {
+test("extract: generics attribute may contain '>'", () => {
   const blocks = extractSvelteScripts(
     '<script lang="ts" generics="T extends Record<string, unknown>">\nconsole.log(1);\n</script>\n',
   );
-  assertEquals(blocks.length, 1);
-  assertEquals(blockAt(blocks, 0).isTypeScript, true);
-  assertEquals(blockAt(blocks, 0).content.includes("console.log"), true);
+  assert.deepEqual(blocks.length, 1);
+  assert.deepEqual(blockAt(blocks, 0).isTypeScript, true);
+  assert.deepEqual(blockAt(blocks, 0).content.includes("console.log"), true);
 });
 
-Deno.test("extract: src attribute means external file, block skipped", () => {
+test("extract: src attribute means external file, block skipped", () => {
   const blocks = extractSvelteScripts(
     '<script src="./external.js"></script>\n<script>\nconsole.log(1);\n</script>\n',
   );
-  assertEquals(blocks.length, 1);
-  assertEquals(blockAt(blocks, 0).content.includes("console.log"), true);
+  assert.deepEqual(blocks.length, 1);
+  assert.deepEqual(blockAt(blocks, 0).content.includes("console.log"), true);
 });
 
-Deno.test("extract: padding preserves original line numbers", () => {
+test("extract: padding preserves original line numbers", () => {
   // Two newlines of padding, then the block's own leading newline: the
   // `console.log` call sits on line 4, exactly as in the component.
-  assertEquals(
+  assert.deepEqual(
     blockAt(
       extractSvelteScripts("<!-- header -->\n<div />\n<script>\nconsole.log(1);\n</script>\n"),
       0,
@@ -105,18 +106,18 @@ Deno.test("extract: padding preserves original line numbers", () => {
   );
 });
 
-Deno.test("analyze: checks fire inside svelte scripts with original lines", () => {
+test("analyze: checks fire inside svelte scripts with original lines", () => {
   const checks = analyzeSource(
     "<!-- header -->\n<script>\nif (items) {}\n</script>\n<div />\n",
     "case.svelte",
   );
-  assertEquals(checks.length, 1);
-  assertEquals(checkAt(checks, 0).checkType, "if");
-  assertEquals(checkAt(checks, 0).line, 3);
+  assert.deepEqual(checks.length, 1);
+  assert.deepEqual(checkAt(checks, 0).checkType, "if");
+  assert.deepEqual(checkAt(checks, 0).line, 3);
 });
 
-Deno.test("analyze: template conditions are checked like script ones", () => {
-  assertEquals(
+test("analyze: template conditions are checked like script ones", () => {
+  assert.deepEqual(
     analyzeSource(
       "<script>\nif (items) {}\n</script>\n{#if visible}<div>{value}</div>{/if}\n{#if count > 0}<p>{count}</p>{/if}\n",
       "case.svelte",
@@ -125,16 +126,16 @@ Deno.test("analyze: template conditions are checked like script ones", () => {
   );
 });
 
-Deno.test("analyze: lang=ts block parses TypeScript syntax", () => {
+test("analyze: lang=ts block parses TypeScript syntax", () => {
   const checks = analyzeSource(
     '<script lang="ts">\nif (items as boolean) {}\n</script>\n',
     "case.svelte",
   );
-  assertEquals(checks.length, 1);
-  assertEquals(checkAt(checks, 0).checkType, "if");
+  assert.deepEqual(checks.length, 1);
+  assert.deepEqual(checkAt(checks, 0).checkType, "if");
 });
 
-Deno.test("analyze: checks from module and instance scripts merge", () => {
+test("analyze: checks from module and instance scripts merge", () => {
   const checks = analyzeSource(
     [
       '<script context="module">',
@@ -146,7 +147,7 @@ Deno.test("analyze: checks from module and instance scripts merge", () => {
     ].join("\n"),
     "case.svelte",
   );
-  assertEquals(checks.length, 2);
-  assertEquals(checkAt(checks, 0).line, 2);
-  assertEquals(checkAt(checks, 1).line, 5);
+  assert.deepEqual(checks.length, 2);
+  assert.deepEqual(checkAt(checks, 0).line, 2);
+  assert.deepEqual(checkAt(checks, 1).line, 5);
 });

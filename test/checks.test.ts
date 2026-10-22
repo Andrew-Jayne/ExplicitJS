@@ -9,7 +9,8 @@
  * Declaration-based checks (single_use_*, single_letter_var) use real bindings.
  */
 
-import { assertEquals } from "jsr:@std/assert@^1.0.19";
+import assert from "node:assert/strict";
+import { test } from "node:test";
 import { CHECK_TYPES } from "../src/constructs.ts";
 import { analyzeSource } from "../src/fileHandlers.ts";
 
@@ -433,7 +434,7 @@ for (const testCase of CASES) {
     }
   }
 
-  Deno.test(testCase.name, () => {
+  test(testCase.name, () => {
     const counts: Counts = {};
     for (const check of analyzeSource(testCase.source, "case.ts")) {
       const current = counts[check.checkType];
@@ -443,28 +444,28 @@ for (const testCase of CASES) {
         counts[check.checkType] = current + 1;
       }
     }
-    assertEquals(counts, testCase.expect);
+    assert.deepEqual(counts, testCase.expect);
   });
 }
 
 // The ternary message is context-sensitive: statements are illegal inside JSX,
 // so the JSX variant must not recommend an in-place if/else block. The marker
 // harness asserts type and count only, so the wording is pinned here.
-Deno.test("ternary: message recommends if/else outside JSX", () => {
+test("ternary: message recommends if/else outside JSX", () => {
   const inJsx = analyzeSource(
     "export function Badge(on: boolean) { return <b>{on === true ? 'y' : 'n'}</b>; }",
     "case.tsx",
   );
-  assertEquals(inJsx.length, 1);
-  assertEquals(inJsx[0]!.context.includes("in JSX"), true);
-  assertEquals(inJsx[0]!.context.includes("before the return"), true);
+  assert.deepEqual(inJsx.length, 1);
+  assert.deepEqual(inJsx[0]!.context.includes("in JSX"), true);
+  assert.deepEqual(inJsx[0]!.context.includes("before the return"), true);
 
   const inCallback = analyzeSource(
     "export function Badge(on: boolean) { return <b>{render(() => (on === true ? 'y' : 'n'))}</b>; }",
     "case.tsx",
   );
-  assertEquals(inCallback.length, 1);
-  assertEquals(
+  assert.deepEqual(inCallback.length, 1);
+  assert.deepEqual(
     inCallback[0]!.context,
     "Ternary expression - use an explicit if/else block instead",
   );

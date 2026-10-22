@@ -35,7 +35,7 @@
  * decorator, which reads no name. Only a genuine call read (`helper()`) flags.
  */
 
-import ts from "typescript";
+import ts from "typescript6";
 import { CheckType, type StyleCheck } from "./constructs.ts";
 
 const EXCLUDED_NAMES: ReadonlySet<string> = new Set(["_"]);

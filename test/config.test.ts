@@ -7,25 +7,11 @@
  * walk actually descends into — is exercised for real rather than mocked.
  */
 
-import { assertEquals } from "jsr:@std/assert@^1.0.19";
+import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { REPO_ROOT } from "./fixtureSpec.ts";
-
-interface CliResult {
-  stdout: string;
-  code: number;
-}
-
-function runCli(cliArgs: string[]): CliResult {
-  const finished = new Deno.Command(Deno.execPath(), {
-    args: ["run", "--allow-read", "--allow-env", path.join(REPO_ROOT, "src", "cli.ts"), ...cliArgs],
-    cwd: REPO_ROOT,
-    stdout: "piped",
-    stderr: "piped",
-  }).outputSync();
-  return { stdout: new TextDecoder().decode(finished.stdout), code: finished.code };
-}
+import { test } from "node:test";
+import { makeTempDir, removeDir, runCli } from "./fixtureSpec.ts";
 
 const PROJECT_DIRS: readonly string[] = [
   "src/app",
@@ -36,7 +22,7 @@ const PROJECT_DIRS: readonly string[] = [
 
 /** A temp project: one violation per directory, plus the given config file. */
 function makeProject(configText: string): string {
-  const root = Deno.makeTempDirSync();
+  const root = makeTempDir();
   for (const directory of PROJECT_DIRS) {
     mkdirSync(path.join(root, directory), { recursive: true });
     writeFileSync(path.join(root, directory, "sample.ts"), "if (value) {}\n");
@@ -45,88 +31,88 @@ function makeProject(configText: string): string {
   return root;
 }
 
-Deno.test("config: format comes from the file, and the flag still wins", () => {
+test("config: format comes from the file, and the flag still wins", () => {
   const root = makeProject('{ "format": "csv" }');
   try {
-    assertEquals(runCli([root]).stdout.startsWith("File,Line,Column"), true);
-    assertEquals(runCli([root, "--format", "json"]).stdout.trimStart().startsWith("["), true);
+    assert.deepEqual(runCli([root]).stdout.startsWith("File,Line,Column"), true);
+    assert.deepEqual(runCli([root, "--format", "json"]).stdout.trimStart().startsWith("["), true);
   } finally {
-    Deno.removeSync(root, { recursive: true });
+    removeDir(root);
   }
 });
 
-Deno.test("config: a bare ignore name skips that directory at any depth", () => {
+test("config: a bare ignore name skips that directory at any depth", () => {
   const root = makeProject('{ "ignore": ["generated"] }');
   try {
     const report = runCli([root, "--format", "json"]).stdout;
-    assertEquals(report.includes(`${path.sep}generated${path.sep}`), false);
-    assertEquals(report.includes(`${path.sep}vendored${path.sep}`), true);
+    assert.deepEqual(report.includes(`${path.sep}generated${path.sep}`), false);
+    assert.deepEqual(report.includes(`${path.sep}vendored${path.sep}`), true);
   } finally {
-    Deno.removeSync(root, { recursive: true });
+    removeDir(root);
   }
 });
 
-Deno.test("config: an ignore entry with a separator resolves against the config file", () => {
+test("config: an ignore entry with a separator resolves against the config file", () => {
   const root = makeProject('{ "ignore": ["src/vendored"] }');
   try {
     const report = runCli([root, "--format", "json"]).stdout;
-    assertEquals(report.includes(`${path.sep}vendored${path.sep}`), false);
-    assertEquals(report.includes(`${path.sep}app${path.sep}`), true);
+    assert.deepEqual(report.includes(`${path.sep}vendored${path.sep}`), false);
+    assert.deepEqual(report.includes(`${path.sep}app${path.sep}`), true);
   } finally {
-    Deno.removeSync(root, { recursive: true });
+    removeDir(root);
   }
 });
 
-Deno.test("config: --config is read from elsewhere, and its paths resolve against it", () => {
+test("config: --config is read from elsewhere, and its paths resolve against it", () => {
   const root = makeProject("{}");
-  const configDir = Deno.makeTempDirSync();
+  const configDir = makeTempDir();
   const configPath = path.join(configDir, "custom.json");
   writeFileSync(configPath, JSON.stringify({ ignore: [path.join(root, "src", "vendored")] }));
   try {
     const report = runCli([root, "--config", configPath, "--format", "json"]).stdout;
-    assertEquals(report.includes(`${path.sep}vendored${path.sep}`), false);
-    assertEquals(report.includes(`${path.sep}app${path.sep}`), true);
+    assert.deepEqual(report.includes(`${path.sep}vendored${path.sep}`), false);
+    assert.deepEqual(report.includes(`${path.sep}app${path.sep}`), true);
   } finally {
-    Deno.removeSync(root, { recursive: true });
-    Deno.removeSync(configDir, { recursive: true });
+    removeDir(root);
+    removeDir(configDir);
   }
 });
 
-Deno.test("config: the built-in skips hold whatever the file says", () => {
+test("config: the built-in skips hold whatever the file says", () => {
   const root = makeProject('{ "ignore": [] }');
   try {
-    assertEquals(
+    assert.deepEqual(
       runCli([root, "--format", "json"]).stdout.includes("node_modules"),
       false,
       "node_modules must never be analyzed",
     );
   } finally {
-    Deno.removeSync(root, { recursive: true });
+    removeDir(root);
   }
 });
 
-Deno.test("config: per-run flags in the file are inert", () => {
+test("config: per-run flags in the file are inert", () => {
   const root = makeProject('{ "stats-only": true, "no-color": true }');
   try {
     const result = runCli([root]);
-    assertEquals(result.stdout.includes("Check Statistics"), false);
-    assertEquals(result.code, 1);
+    assert.deepEqual(result.stdout.includes("Check Statistics"), false);
+    assert.deepEqual(result.code, 1);
   } finally {
-    Deno.removeSync(root, { recursive: true });
+    removeDir(root);
   }
 });
 
-Deno.test("config: no key can disable a check", () => {
+test("config: no key can disable a check", () => {
   const root = makeProject('{ "include-extra": [], "disable": ["if"], "if": false }');
   try {
-    assertEquals(runCli([root, "--format", "json"]).stdout.includes('"if"'), true);
+    assert.deepEqual(runCli([root, "--format", "json"]).stdout.includes('"if"'), true);
   } finally {
-    Deno.removeSync(root, { recursive: true });
+    removeDir(root);
   }
 });
 
-Deno.test("walk: build-output names are skipped only where build tools put them", () => {
-  const root = Deno.makeTempDirSync();
+test("walk: build-output names are skipped only where build tools put them", () => {
+  const root = makeTempDir();
   try {
     writeFileSync(path.join(root, "package.json"), "{}\n");
     mkdirSync(path.join(root, "packages", "app"), { recursive: true });
@@ -143,13 +129,13 @@ Deno.test("walk: build-output names are skipped only where build tools put them"
     }
     const report = runCli([root, "--format", "json"]).stdout;
     // Beside a manifest: output, skipped.
-    assertEquals(report.includes(`${root}${path.sep}dist${path.sep}`), false);
-    assertEquals(report.includes(`app${path.sep}build${path.sep}`), false);
+    assert.deepEqual(report.includes(`${root}${path.sep}dist${path.sep}`), false);
+    assert.deepEqual(report.includes(`app${path.sep}build${path.sep}`), false);
     // Anywhere else the same names are ordinary source directories.
-    assertEquals(report.includes(`features${path.sep}build${path.sep}`), true);
-    assertEquals(report.includes(`src${path.sep}out${path.sep}`), true);
-    assertEquals(report.includes(`src${path.sep}vendor${path.sep}`), true);
+    assert.deepEqual(report.includes(`features${path.sep}build${path.sep}`), true);
+    assert.deepEqual(report.includes(`src${path.sep}out${path.sep}`), true);
+    assert.deepEqual(report.includes(`src${path.sep}vendor${path.sep}`), true);
   } finally {
-    Deno.removeSync(root, { recursive: true });
+    removeDir(root);
   }
 });

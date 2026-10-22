@@ -10,46 +10,30 @@
  * scripts/update-nfo.sh and review the diff in the commit.
  */
 
-import { assertEquals } from "jsr:@std/assert@^1.0.19";
+import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { REPO_ROOT } from "./fixtureSpec.ts";
+import { test } from "node:test";
+import { REPO_ROOT, runCli } from "./fixtureSpec.ts";
 
 const NFO_DIR = path.join(REPO_ROOT, "nfo");
 
 function liveOutput(target: string): string {
-  return new TextDecoder()
-    .decode(
-      new Deno.Command(Deno.execPath(), {
-        args: [
-          "run",
-          "--allow-read",
-          "--allow-env",
-          path.join(REPO_ROOT, "src", "cli.ts"),
-          target,
-          "--stats-only",
-          "--no-color",
-        ],
-        cwd: REPO_ROOT,
-        stdout: "piped",
-        stderr: "piped",
-      }).outputSync().stdout,
-    )
-    .trim();
+  return runCli([target, "--stats-only", "--no-color"]).stdout.trim();
 }
 
 function committed(name: string): string {
   return readFileSync(path.join(NFO_DIR, name), "utf-8").trim();
 }
 
-Deno.test("baseline: src/ report never changes (always zero checks)", () => {
+test("baseline: src/ report never changes (always zero checks)", () => {
   const baseline = committed("explicit.out");
-  assertEquals(liveOutput("src"), baseline);
-  assertEquals(baseline.includes("Total checks found: 0"), true);
+  assert.deepEqual(liveOutput("src"), baseline);
+  assert.deepEqual(baseline.includes("Total checks found: 0"), true);
 });
 
-Deno.test("baseline: tests tree stats match nfo (exactly the fixture specimens)", () => {
-  assertEquals(liveOutput("test"), committed("tests.out"));
+test("baseline: tests tree stats match nfo (exactly the fixture specimens)", () => {
+  assert.deepEqual(liveOutput("test"), committed("tests.out"));
 });
 
 // The stats baseline only pins totals, so a real violation in the harness can
@@ -58,29 +42,16 @@ Deno.test("baseline: tests tree stats match nfo (exactly the fixture specimens)"
 // by line against their markers in fixtures.test.ts.
 const FIXTURES_PREFIX = `${path.join("test", "fixtures")}${path.sep}`;
 
-Deno.test("baseline: the only findings in the tests tree are fixture specimens", () => {
+test("baseline: the only findings in the tests tree are fixture specimens", () => {
   const strays: string[] = [];
-  for (const finding of JSON.parse(
-    new TextDecoder().decode(
-      new Deno.Command(Deno.execPath(), {
-        args: [
-          "run",
-          "--allow-read",
-          "--allow-env",
-          path.join(REPO_ROOT, "src", "cli.ts"),
-          "test",
-          "--format",
-          "json",
-        ],
-        cwd: REPO_ROOT,
-        stdout: "piped",
-        stderr: "piped",
-      }).outputSync().stdout,
-    ),
-  ) as { file: string; line: number; check_type: string }[]) {
+  for (const finding of JSON.parse(runCli(["test", "--format", "json"]).stdout) as {
+    file: string;
+    line: number;
+    check_type: string;
+  }[]) {
     if (finding.file.startsWith(FIXTURES_PREFIX) === false) {
       strays.push(`${finding.file}:${finding.line} ${finding.check_type}`);
     }
   }
-  assertEquals(strays, []);
+  assert.deepEqual(strays, []);
 });

@@ -8,7 +8,8 @@
  * itself, so optional chaining is off the table even in tests.
  */
 
-import { assertEquals } from "jsr:@std/assert@^1.0.19";
+import assert from "node:assert/strict";
+import { test } from "node:test";
 import type { StyleCheck } from "../src/constructs.ts";
 import { analyzeSource } from "../src/fileHandlers.ts";
 import { extractVueScripts, type VueScriptBlock } from "../src/vueParser.ts";
@@ -29,17 +30,17 @@ function checkAt(checks: StyleCheck[], index: number): StyleCheck {
   return check;
 }
 
-Deno.test("extract: no script block yields no blocks", () => {
-  assertEquals(extractVueScripts("<template>\n  <div>static</div>\n</template>\n"), []);
+test("extract: no script block yields no blocks", () => {
+  assert.deepEqual(extractVueScripts("<template>\n  <div>static</div>\n</template>\n"), []);
 });
 
-Deno.test("extract: script block is plain JS by default", () => {
+test("extract: script block is plain JS by default", () => {
   const blocks = extractVueScripts("<script>\nconsole.log(1);\n</script>\n");
-  assertEquals(blocks.length, 1);
-  assertEquals(blockAt(blocks, 0).lang, "js");
+  assert.deepEqual(blocks.length, 1);
+  assert.deepEqual(blockAt(blocks, 0).lang, "js");
 });
 
-Deno.test("extract: lang attribute picks the dialect", () => {
+test("extract: lang attribute picks the dialect", () => {
   for (const [attr, lang] of [
     ['lang="ts"', "ts"],
     ["lang='ts'", "ts"],
@@ -48,8 +49,8 @@ Deno.test("extract: lang attribute picks the dialect", () => {
     ['lang="tsx"', "tsx"],
     ['lang="jsx"', "jsx"],
     ['lang="coffee"', "js"],
-  ]) {
-    assertEquals(
+  ] as const) {
+    assert.deepEqual(
       blockAt(extractVueScripts(`<script ${attr}>\nconsole.log(1);\n</script>\n`), 0).lang,
       lang,
       attr,
@@ -57,7 +58,7 @@ Deno.test("extract: lang attribute picks the dialect", () => {
   }
 });
 
-Deno.test("extract: plain script and script setup both come back", () => {
+test("extract: plain script and script setup both come back", () => {
   const blocks = extractVueScripts(
     [
       '<script lang="ts">',
@@ -69,40 +70,40 @@ Deno.test("extract: plain script and script setup both come back", () => {
       "<template><div /></template>",
     ].join("\n"),
   );
-  assertEquals(blocks.length, 2);
-  assertEquals(blockAt(blocks, 0).lang, "ts");
-  assertEquals(blockAt(blocks, 1).lang, "ts");
+  assert.deepEqual(blocks.length, 2);
+  assert.deepEqual(blockAt(blocks, 0).lang, "ts");
+  assert.deepEqual(blockAt(blocks, 1).lang, "ts");
 });
 
-Deno.test("extract: generic attribute may contain '>'", () => {
+test("extract: generic attribute may contain '>'", () => {
   const blocks = extractVueScripts(
     '<script setup lang="ts" generic="T extends Record<string, any>">\nconsole.log(1);\n</script>\n',
   );
-  assertEquals(blocks.length, 1);
-  assertEquals(blockAt(blocks, 0).lang, "ts");
-  assertEquals(blockAt(blocks, 0).content.includes("console.log"), true);
+  assert.deepEqual(blocks.length, 1);
+  assert.deepEqual(blockAt(blocks, 0).lang, "ts");
+  assert.deepEqual(blockAt(blocks, 0).content.includes("console.log"), true);
 });
 
-Deno.test("extract: src attribute means external file, block skipped", () => {
+test("extract: src attribute means external file, block skipped", () => {
   const blocks = extractVueScripts(
     '<script src="./external.js"></script>\n<script>\nconsole.log(1);\n</script>\n',
   );
-  assertEquals(blocks.length, 1);
-  assertEquals(blockAt(blocks, 0).content.includes("console.log"), true);
+  assert.deepEqual(blocks.length, 1);
+  assert.deepEqual(blockAt(blocks, 0).content.includes("console.log"), true);
 });
 
-Deno.test("analyze: checks fire inside vue scripts with original lines", () => {
+test("analyze: checks fire inside vue scripts with original lines", () => {
   const checks = analyzeSource(
     "<template>\n  <div />\n</template>\n<script setup>\nif (items) {}\n</script>\n",
     "case.vue",
   );
-  assertEquals(checks.length, 1);
-  assertEquals(checkAt(checks, 0).checkType, "if");
-  assertEquals(checkAt(checks, 0).line, 5);
+  assert.deepEqual(checks.length, 1);
+  assert.deepEqual(checkAt(checks, 0).checkType, "if");
+  assert.deepEqual(checkAt(checks, 0).line, 5);
 });
 
-Deno.test("analyze: template conditions are checked like script ones", () => {
-  assertEquals(
+test("analyze: template conditions are checked like script ones", () => {
+  assert.deepEqual(
     analyzeSource(
       '<template>\n  <div v-if="visible">{{ value }}</div>\n  <p v-if="count > 0">{{ count }}</p>\n</template>\n<script setup>\nif (items) {}\n</script>\n',
       "case.vue",
@@ -111,16 +112,16 @@ Deno.test("analyze: template conditions are checked like script ones", () => {
   );
 });
 
-Deno.test("analyze: lang=ts block parses TypeScript syntax", () => {
+test("analyze: lang=ts block parses TypeScript syntax", () => {
   const checks = analyzeSource(
     '<script setup lang="ts">\nif (items as boolean) {}\n</script>\n',
     "case.vue",
   );
-  assertEquals(checks.length, 1);
-  assertEquals(checkAt(checks, 0).checkType, "if");
+  assert.deepEqual(checks.length, 1);
+  assert.deepEqual(checkAt(checks, 0).checkType, "if");
 });
 
-Deno.test("analyze: checks from both script blocks merge", () => {
+test("analyze: checks from both script blocks merge", () => {
   const checks = analyzeSource(
     [
       "<script>",
@@ -132,7 +133,7 @@ Deno.test("analyze: checks from both script blocks merge", () => {
     ].join("\n"),
     "case.vue",
   );
-  assertEquals(checks.length, 2);
-  assertEquals(checkAt(checks, 0).line, 2);
-  assertEquals(checkAt(checks, 1).line, 5);
+  assert.deepEqual(checks.length, 2);
+  assert.deepEqual(checkAt(checks, 0).line, 2);
+  assert.deepEqual(checkAt(checks, 1).line, 5);
 });

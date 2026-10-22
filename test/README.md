@@ -17,7 +17,7 @@ The suite mirrors the Python `explicit` project's fixture-marker architecture.
 | `checks.test.ts`, `svelte.test.ts`, `vue.test.ts` | The older table-driven/unit suites, kept alongside: inline snippets for check edge cases and the SFC extractors. |
 | `markupAttrs.test.ts` | The template scanner's bare-attribute pass (`bool_attr`): directive exemptions and scan hazards (comments, quoted `>`, brace expressions, a lone `{` in Vue text). Template *expressions* are covered by the `.svelte`/`.vue` fixtures. |
 
-Deno's test runner collects only `*.test.ts` files, so the `test_*` fixtures are
+`pnpm test` runs only `test/*.test.ts`, so the `test_*` fixtures are
 **never executed or type-checked** — executing them would crash on their calls
 to undefined helpers, and type-checking would reject the undeclared names. They
 are only read as text and parsed (via `analyzeFile`) or transpiled (via
@@ -78,17 +78,17 @@ cases, a new source file — regenerate everything and review the diff in the
 commit:
 
 ```bash
-deno task update-nfo
+pnpm update-nfo
 ```
 
 ## Workflow
 
 ```bash
-deno task test                                # everything
-deno test --allow-read --allow-env test/fixtures.test.ts   # one concern
-deno test --allow-read --allow-env test/ --filter test_if  # one fixture
+pnpm test                                                   # everything
+node --test test/fixtures.test.ts                           # one concern
+node --test --test-name-pattern test_if "test/*.test.ts"    # one fixture
 ```
 
 When you add or change a check: update the matching fixture's markers in the
 same change, add its `CHECK_DESCRIPTIONS` / `EXTRA_DESCRIPTIONS` entry in
-`src/constructs.ts`, regenerate `nfo/`, and run `deno task test`.
+`src/constructs.ts`, regenerate `nfo/`, and run `pnpm test`.

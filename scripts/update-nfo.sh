@@ -9,8 +9,8 @@ mkdir -p nfo
 
 # The src/ report must always show zero checks (exit 0); the tests tree holds
 # the deliberate fixture specimens, so its run exits 1 - both are fine here.
-deno run --allow-read --allow-env src/cli.ts src --stats-only --no-color > nfo/explicit.out
-deno run --allow-read --allow-env src/cli.ts test --stats-only --no-color > nfo/tests.out || true
+node src/cli.ts src --stats-only --no-color > nfo/explicit.out
+node src/cli.ts test --stats-only --no-color > nfo/tests.out || true
 
 if command -v cloc > /dev/null; then
   cloc --quiet src > nfo/code_count_explicit.nfo

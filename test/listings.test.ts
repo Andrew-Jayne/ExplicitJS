@@ -4,18 +4,19 @@
  * Adding a CheckType without a description fails these tests.
  */
 
-import { assertEquals } from "jsr:@std/assert@^1.0.19";
+import assert from "node:assert/strict";
+import { test } from "node:test";
 import { CHECK_DESCRIPTIONS, CHECK_TYPES } from "../src/constructs.ts";
 import { generateChecksListing } from "../src/reporters.ts";
 
-Deno.test("list-checks documents every CheckType member, in registry order", () => {
-  assertEquals(Object.keys(CHECK_DESCRIPTIONS), [...CHECK_TYPES]);
+test("list-checks documents every CheckType member, in registry order", () => {
+  assert.deepEqual(Object.keys(CHECK_DESCRIPTIONS), [...CHECK_TYPES]);
 });
 
-Deno.test("the rendered listing names every check it covers", () => {
+test("the rendered listing names every check it covers", () => {
   const checksListing = generateChecksListing();
-  assertEquals(checksListing.length > 0, true);
+  assert.deepEqual(checksListing.length > 0, true);
   for (const checkType of CHECK_TYPES) {
-    assertEquals(checksListing.includes(checkType), true, checkType);
+    assert.deepEqual(checksListing.includes(checkType), true, checkType);
   }
 });

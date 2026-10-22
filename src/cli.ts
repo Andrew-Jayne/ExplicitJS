@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --allow-read
+#!/usr/bin/env node
 /**
  * Executable entry point for ExplicitJS.
  */
@@ -7,7 +7,7 @@ import process from "node:process";
 import { ArgError, type Args, helpText, parseArgs } from "./cliArgs.ts";
 import { EXIT_ARGS_ERROR, run } from "./main.ts";
 
-const VERSION = "1beta5";
+const VERSION = "1beta6";
 
 function writeOut(message: string): void {
   process.stdout.write(message);

@@ -1,6 +1,6 @@
 {
   "name": "explicitjs",
-  "version": "1beta5",
+  "version": "1beta6",
   "private": false,
   "type": "module",
   "description": "A semantic clarity enforcer for production JavaScript & TypeScript.",
@@ -12,20 +12,26 @@
     "dist"
   ],
   "scripts": {
-    "start": "tsx src/cli.ts",
-    "lint": "tsx src/cli.ts src",
+    "start": "node src/cli.ts",
+    "lint": "node src/cli.ts src",
+    "test": "node --test \"test/*.test.ts\"",
+    "check": "tsc --noEmit",
     "fmt": "biome check --write .",
     "fmt:check": "biome ci .",
-    "check": "tsc --noEmit",
-    "build": "tsc -p tsconfig.build.json && sed -i.bak '1s|.*|#!/usr/bin/env node|' dist/cli.js && rm -f dist/cli.js.bak && chmod +x dist/cli.js",
-    "prepack": "bun run build"
+    "update-nfo": "bash scripts/update-nfo.sh",
+    "build": "tsc -p tsconfig.build.json && chmod +x dist/cli.js",
+    "prepack": "pnpm run build"
   },
   "dependencies": {
-    "typescript": "^6.0.3"
+    "typescript6": "npm:typescript@^6.0.3"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.12",
-    "@types/node": "^26.5.0",
-    "tsx": "^4.23.13"
-  }
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "packageManager": "pnpm@12.14.0"
 }

@@ -10,7 +10,7 @@ if (name === null) {
 cachedTotal ??= computeTotal(); // expect: nullish_coalesce
 
 // Default values fill in only on `undefined`: `??` in disguise.
-export function listen(port = 3000): number { // expect: nullish_coalesce
+export function listen(port = defaultPort()): number { // expect: nullish_coalesce
   return port;
 }
 export function label(text: string | null = null): string | null {

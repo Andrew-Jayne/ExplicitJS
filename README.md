@@ -6,7 +6,7 @@ ExplicitJS flags code where the author's intent is ambiguous — patterns that f
 
 Prebuilt tarball attached to every GitHub Release:
 ```bash
-pnpm add -D https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta6/explicitjs-1beta6.tgz
+pnpm add -D https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta7/explicitjs-1beta7.tgz
 ```
 
 Other routes (global install, running from a clone) see: [docs/install.md](docs/install.md).
@@ -20,7 +20,7 @@ Every check is always on. Like [Black](https://github.com/psf/black), ExplicitJS
 | **Implicit booleans** in `if` / `while` / `do…while` / `for (…; cond; …)` | `if (items)` — checking length? nullness? | `if (items.length > 0)` or `if (items !== null)` |
 | **`assert` truthiness** (`assert(x)`, `console.assert(x)`, `assert.ok(x)`, `assert.strict(x)` — including import aliases like `import { ok } from "node:assert"` — and test runners' `expect(x).toBeTruthy()` / `.toBeFalsy()`) | Relies on coercion | `assert(x !== undefined)`, `expect(x).not.toBeNull()` |
 | **Ternary expressions** | `cond ? x : y` — buries control flow | Explicit `if`/`else` block |
-| **Nullish coalescing** (`??`, `??=`, and default values) | `env.PORT ?? 3000` — an inline if in disguise; so are `const { PORT = 3000 } = env` and `function listen(port = 3000)`, which fill in only on `undefined` | Explicit `=== null` / `=== undefined` check with `if`/`else`. The one allowed default is a parameter's `= null` |
+| **Nullish coalescing** (`??`, `??=`, and default values) | `env.PORT ?? 3000` — an inline if in disguise; so are `const { PORT = 3000 } = env` and `function listen(port = computePort())`, which fill in only on `undefined` | Explicit `=== null` / `=== undefined` check with `if`/`else`. A parameter's literal default (`= null`, `= false`, `= 0`, `= ""`) is allowed: it removes `undefined` before the body runs |
 | **Optional chaining** | `request?.headers?.token` — is a missing field expected or a bug? | Validate the shape once (schema/type), then access directly |
 | **Non-null assertions** | `request!.headers!.token` — presence claimed, never checked | Validate the shape, or test `=== null` / `=== undefined` explicitly. `items[0]!` index access is exempt (the `noUncheckedIndexedAccess` idiom). Definite assignment (`token!: string`, `let config!: Config`) is the same claim and is flagged too |
 | **Optional members** (`name?: T`) | `label?: string` on a parameter, property or method — or JSDoc's `@param {string} [label]` / `@property {string} [label]` — is an absent value meaningful or an accident? | `label: string \| null`, plus `= null` where a default is legal |
@@ -36,7 +36,7 @@ Every check is always on. Like [Black](https://github.com/psf/black), ExplicitJS
 
 Optional chaining and optional members are two halves of one rule. `response?.data?.messages?.text` is only reasonable because something upstream declared those fields optional, so the optional-member check closes the hole: a type that says `data: Data | null` forces the reader — and the next caller — to handle the absent case explicitly instead of chaining past it.
 
-Optional members are flagged wherever `?` appears on a parameter, property or method: implementations, interfaces, type literals, classes and overload signatures alike. Where a default is legal (a parameter of an implementation, a concrete class field) the advice adds `= null`, so existing callers keep working; where it is not, the type carries the `| null` and every construction site states the field. The same goes for optionality that never writes a `?` on a member: `Partial<T>` and a mapped type with `?:` (`{ [Key in keyof T]?: T[Key] }`, which is how `Partial` is defined) make every field optional at once, so both are flagged too; map to `T[Key] | null` instead. `-?` (as in `Required<T>`) removes optionality and is fine. Optional tuple elements (`[name: string, label?: string]`) are out of scope.
+Optional members are flagged wherever `?` appears on a parameter, property or method: implementations, interface properties and methods, type literals, classes and overload signatures alike. The one exception is a method parameter inside an `interface` declaration (`fetch(query?: string): void`), where `?` is allowed; the implementation then takes a literal default (`query: string | null = null`), so no `undefined` reaches its body. An implementation parameter typed `T | undefined` without a default is flagged for the same reason. Where a default is legal (a parameter of an implementation, a concrete class field) the advice adds `= null`, so existing callers keep working; where it is not, the type carries the `| null` and every construction site states the field. The same goes for optionality that never writes a `?` on a member: `Partial<T>` and a mapped type with `?:` (`{ [Key in keyof T]?: T[Key] }`, which is how `Partial` is defined) make every field optional at once, so both are flagged too; map to `T[Key] | null` instead. `-?` (as in `Required<T>`) removes optionality and is fine. Optional tuple elements (`[name: string, label?: string]`) are out of scope.
 
 ## Usage
 

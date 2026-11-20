@@ -6,11 +6,11 @@ ExplicitJS is not published to any package registry. Each [Release](https://gith
 
 ```bash
 # pnpm, as a dev dependency
-pnpm add -D https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta6/explicitjs-1beta6.tgz
+pnpm add -D https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta7/explicitjs-1beta7.tgz
 pnpm exec explicitjs <path>
 
 # npm, global install
-npm install -g https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta6/explicitjs-1beta6.tgz
+npm install -g https://github.com/Andrew-Jayne/ExplicitJS/releases/download/v1beta7/explicitjs-1beta7.tgz
 explicitjs <path>
 ```
 

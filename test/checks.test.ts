@@ -343,9 +343,9 @@ const CASES: Case[] = [
     expect: { optional_param: 1 },
   },
   {
-    name: "optional_param: parameter of an interface method signature",
+    name: "optional_param: interface method parameter is allowed",
     source: "export interface Api { fetch(query?: string): void; }",
-    expect: { optional_param: 1 },
+    expect: {},
   },
   {
     name: "optional_param: overload declaration and implementation are both flagged",
@@ -369,7 +369,7 @@ const CASES: Case[] = [
     expect: { optional_param: 1 },
   },
   {
-    name: "optional_param: optional method signature",
+    name: "optional_param: optional interface method",
     source: "export interface Hooks { onClose?(): void; }",
     expect: { optional_param: 1 },
   },
@@ -387,6 +387,48 @@ const CASES: Case[] = [
     name: "optional_param: optional tuple member is out of scope",
     source: "export type Pair = [name: string, label?: string];",
     expect: {},
+  },
+
+  {
+    name: "optional_param: interface method parameter in a type literal is flagged",
+    source: "export type Api = { fetch(query?: string): void };",
+    expect: { optional_param: 1 },
+  },
+  {
+    name: "optional_param: function-typed interface property parameter is flagged",
+    source: "export interface Api { fetch: (query?: string) => void; }",
+    expect: { optional_param: 1 },
+  },
+  {
+    name: "optional_param: '| undefined' parameter without default",
+    source: "export function fn(query: string | undefined): void { use(query); }",
+    expect: { optional_param: 1 },
+  },
+  {
+    name: "optional_param: '| undefined' parameter in a declaration is out of scope",
+    source: "export declare function fn(query: string | undefined): void;",
+    expect: {},
+  },
+  {
+    name: "nullish_coalesce: boolean literal default is clean",
+    source: "export function fn(flag: boolean = false): void { use(flag); }",
+    expect: {},
+  },
+  {
+    name: "nullish_coalesce: numeric, negative and string literal defaults are clean",
+    source:
+      'export function fn(count: number = 0, floor: number = -1, label: string = ""): void { use(count, floor, label); }',
+    expect: {},
+  },
+  {
+    name: "nullish_coalesce: computed parameter default",
+    source: "export function fn(port: number = computePort()): void { use(port); }",
+    expect: { nullish_coalesce: 1 },
+  },
+  {
+    name: "nullish_coalesce: identifier parameter default",
+    source: "export function fn(port: number = DEFAULT_PORT): void { use(port); }",
+    expect: { nullish_coalesce: 1 },
   },
 
   // --- arrow / function expressions --------------------------------------

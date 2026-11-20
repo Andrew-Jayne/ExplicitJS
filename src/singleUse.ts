@@ -76,7 +76,7 @@ interface PendingRead {
 }
 
 interface Scope {
-  parent: Scope | undefined;
+  parent: Scope | null;
   isClass: boolean;
   declared: Set<string>;
   importedNames: Set<string>;
@@ -166,7 +166,7 @@ export function findSingleUse(
 
   // The SourceFile node itself seeds the walk: its children are the top-level
   // statements, so the default traversal collects them into the module scope.
-  collect(sourceFile, createScope(undefined, false, ctx), ctx);
+  collect(sourceFile, createScope(null, false, ctx), ctx);
 
   // --- reference resolution -------------------------------------------------
   // Every write resolves before any read, so reads see the complete bindings.
@@ -316,7 +316,7 @@ function isClassLike(node: ts.Node): node is ts.ClassLikeDeclaration {
   );
 }
 
-function createScope(parent: Scope | undefined, isClass: boolean, ctx: ScopeContext): Scope {
+function createScope(parent: Scope | null, isClass: boolean, ctx: ScopeContext): Scope {
   const scope: Scope = {
     parent,
     isClass,
@@ -699,8 +699,8 @@ function collectPatternNames(pattern: ts.BindingPattern, out: ts.Identifier[]): 
 // --- reference resolution ---------------------------------------------------
 
 function findDeclaringScope(scope: Scope, name: string): Scope | undefined {
-  let current: Scope | undefined = scope;
-  while (current !== undefined) {
+  let current: Scope | null = scope;
+  while (current !== null) {
     if (current.declared.has(name) === true) {
       return current;
     }

@@ -67,7 +67,7 @@ export const CHECK_DESCRIPTIONS: Readonly<Record<CheckType, string>> = {
     "Implicit truthiness in assert/console.assert/assert.ok/assert.strict (however imported or spelled) or expect(...).toBeTruthy()/.toBeFalsy() - assert an explicit comparison",
   [CheckType.TERNARY]: "Inline conditional 'cond ? x : y' - use an explicit if/else block",
   [CheckType.NULLISH_COALESCE]:
-    "'??' / '??=' inline null-defaulting, and default values that do the same ('const { port = 3000 } = env', 'function listen(port = 3000)') - test === null / === undefined explicitly; a parameter's '= null' is the one allowed default",
+    "'??' / '??=' inline null-defaulting, and default values that do the same ('const { port = 3000 } = env', 'function listen(port = computePort())') - test === null / === undefined explicitly; a parameter's literal default ('= null', '= false', '= 0', '= \"\"') is allowed, since it removes undefined before the body runs",
   [CheckType.OPTIONAL_CHAIN]:
     "Optional chaining 'a?.b' hides missing fields - validate the shape once, then access directly",
   [CheckType.NON_NULL]:
@@ -90,7 +90,7 @@ export const CHECK_DESCRIPTIONS: Readonly<Record<CheckType, string>> = {
   [CheckType.SINGLE_USE_FUNC]:
     "Function, or private class method, called exactly once - inline it at the call site (exports and 'main' are exempt)",
   [CheckType.OPTIONAL_PARAM]:
-    "Optional 'name?: T' parameter, property or method (or JSDoc '[name]'), or optional-everything via Partial<T> / a '?:' mapped type - write 'name: T | null' (plus '= null' where a default is legal) so the absent value is named and callers must handle it",
+    "Optional 'name?: T' parameter, property or method (or JSDoc '[name]'; method parameters inside an 'interface' are allowed), or optional-everything via Partial<T> / a '?:' mapped type - write 'name: T | null' (plus '= null' where a default is legal) so the absent value is named and callers must handle it",
 };
 
 export interface StyleCheck {

@@ -587,18 +587,51 @@ export class CodeVisitor {
       case ts.SyntaxKind.Parameter: {
         this.checkOptionalMember(node as OptionalMember);
         const parameter = node as ts.ParameterDeclaration;
-        // `port = 3000` fills in only when the argument is undefined: `??` in
-        // disguise. `= null` is the one default allowed, the explicit form the
-        // optional_param check asks for.
-        if (
-          parameter.initializer !== undefined &&
-          parameter.initializer.kind !== ts.SyntaxKind.NullKeyword
-        ) {
+        // `port = computePort()` fills in only when the argument is undefined:
+        // `??` in disguise. A literal default is stated in plain view, and it
+        // removes undefined before the body runs.
+        const initializer = parameter.initializer;
+        let isLiteralDefault = false;
+        if (initializer !== undefined) {
+          let literal: ts.Expression = initializer;
+          if (
+            ts.isPrefixUnaryExpression(initializer) === true &&
+            initializer.operator === ts.SyntaxKind.MinusToken
+          ) {
+            literal = initializer.operand;
+          }
+          isLiteralDefault =
+            literal.kind === ts.SyntaxKind.NullKeyword ||
+            literal.kind === ts.SyntaxKind.TrueKeyword ||
+            literal.kind === ts.SyntaxKind.FalseKeyword ||
+            ts.isNumericLiteral(literal) === true ||
+            (literal === initializer &&
+              (ts.isStringLiteral(literal) === true ||
+                ts.isNoSubstitutionTemplateLiteral(literal) === true));
+        }
+        if (initializer !== undefined && isLiteralDefault === false) {
           this.addCheck(
             parameter,
             CheckType.NULLISH_COALESCE,
-            `Parameter default '= ${truncate(parameter.initializer.getText(this.sourceFile))}' is an inline undefined-check like '??' - declare 'name: T | null = null' and test === null in the body`,
+            `Parameter default '= ${truncate(initializer.getText(this.sourceFile))}' is an inline undefined-check like '??' - only a literal default is allowed; compute the value in the body and test === null`,
           );
+        }
+        if (
+          initializer === undefined &&
+          parameter.type !== undefined &&
+          ts.isUnionTypeNode(parameter.type) === true &&
+          ts.isFunctionLike(parameter.parent) === true &&
+          (parameter.parent as ts.FunctionLikeDeclaration).body !== undefined
+        ) {
+          for (const member of parameter.type.types) {
+            if (member.kind === ts.SyntaxKind.UndefinedKeyword) {
+              this.addCheck(
+                parameter,
+                CheckType.OPTIONAL_PARAM,
+                `Parameter '${parameter.name.getText(this.sourceFile)}' of an implementation may be undefined - type it 'T | null = null' or give it a literal default`,
+              );
+            }
+          }
         }
         // `@param {string} [label]` is `label?: string` written in a comment.
         for (const tag of ts.getJSDocParameterTags(parameter)) {
@@ -944,6 +977,9 @@ export class CodeVisitor {
       return;
     }
     if (ts.isParameter(node) === true && ts.isFunctionLike(node.parent) === false) {
+      return;
+    }
+    if (ts.isParameter(node) === true && ts.isInterfaceDeclaration(node.parent.parent) === true) {
       return;
     }
 

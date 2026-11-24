@@ -384,6 +384,31 @@ const CASES: Case[] = [
     expect: {},
   },
   {
+    name: "optional_param: optional nullable interface property is allowed",
+    source: "export interface Options { label?: string | null; }",
+    expect: {},
+  },
+  {
+    name: "optional_param: optional nullable type literal property is allowed",
+    source: "export type Options = { label?: (string | number) | null };",
+    expect: {},
+  },
+  {
+    name: "optional_param: optional property without null is still flagged",
+    source: "export interface Options { label?: string | undefined; }",
+    expect: { optional_param: 1 },
+  },
+  {
+    name: "optional_param: optional nullable class property is still flagged",
+    source: "export class Box { private label?: string | null; }",
+    expect: { optional_param: 1 },
+  },
+  {
+    name: "optional_param: optional nullable parameter is still flagged",
+    source: "export function fn(config?: Options | null): void {}",
+    expect: { optional_param: 1 },
+  },
+  {
     name: "optional_param: optional tuple member is out of scope",
     source: "export type Pair = [name: string, label?: string];",
     expect: {},

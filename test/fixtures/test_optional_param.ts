@@ -1,5 +1,6 @@
 // Fixture: the `optional_param` check — every `name?: T` declaration, except
-// a method parameter inside an interface. A
+// a method parameter inside an interface and an interface or type-literal
+// property whose type includes `null` (`name?: T | null`). A
 // parameter of an implementation or a concrete class field can carry `= null`;
 // type-space declarations (interfaces, type literals, overload signatures)
 // take the bare `| null` union and make every construction site state it.
@@ -16,6 +17,7 @@ export function farewell(name: string | null = null): string {
 export interface GreeterOptions {
   label?: string; // expect: optional_param
   prefix: string | null;
+  suffix?: string | null;
   onDone?(): void; // expect: optional_param
   fetch(query?: string): void;
 }

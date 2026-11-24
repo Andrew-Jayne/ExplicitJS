@@ -982,6 +982,28 @@ export class CodeVisitor {
     if (ts.isParameter(node) === true && ts.isInterfaceDeclaration(node.parent.parent) === true) {
       return;
     }
+    // An options-shape property (`persistent?: boolean | null`) names its
+    // absent value in the type, and the `?` lets an object literal leave it
+    // out — keyword arguments for a constructor or function. The implementation
+    // then resolves `undefined` with an explicit check. Class fields can carry
+    // `= null` instead, so this applies only to interface and type-literal
+    // properties.
+    if (ts.isPropertySignature(node) === true && node.type !== undefined) {
+      let declared: ts.TypeNode = node.type;
+      while (ts.isParenthesizedTypeNode(declared) === true) {
+        declared = declared.type;
+      }
+      if (ts.isUnionTypeNode(declared) === true) {
+        for (const member of declared.types) {
+          if (
+            ts.isLiteralTypeNode(member) === true &&
+            member.literal.kind === ts.SyntaxKind.NullKeyword
+          ) {
+            return;
+          }
+        }
+      }
+    }
 
     const name = node.name.getText(this.sourceFile);
     if (ts.isMethodSignature(node) === true || ts.isMethodDeclaration(node) === true) {
@@ -1006,6 +1028,10 @@ export class CodeVisitor {
     // `name: T | null`: an implementation's parameter, or a class field that
     // is neither abstract nor `declare`.
     let suffix = "";
+    let optionsHint = "";
+    if (ts.isPropertySignature(node) === true) {
+      optionsHint = `, or '${name}?: ${typeText} | null' to let callers omit it`;
+    }
     if (ts.isParameter(node) === true) {
       if ((node.parent as ts.FunctionLikeDeclaration).body !== undefined) {
         suffix = " = null";
@@ -1026,7 +1052,7 @@ export class CodeVisitor {
     this.addCheck(
       node,
       CheckType.OPTIONAL_PARAM,
-      `Optional ${kind} '${name}?' leaves absence implicit - use '${name}: ${typeText} | null${suffix}'`,
+      `Optional ${kind} '${name}?' leaves absence implicit - use '${name}: ${typeText} | null${suffix}'${optionsHint}`,
     );
   }
 
